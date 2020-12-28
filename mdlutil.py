@@ -56,57 +56,104 @@ def get_stat(cls, df_data,feature_name,label_name,n_bin=10,qcut_method=1):
     return df_stat
 
 
-def get_ks(ytrue, yprob):
-    fpr, tpr, thr = roc_curve(ytrue, yprob)
-    return max(abs(tpr - fpr))
 
 def get_iv(cls, df_label, df_feature):
     df_stat = cls.get_stat(df_label, df_feature)
     return df_stat['iv'].sum()
 
-def get_gini(cls, ytrue, yprob):
-    auc = cls.get_auc(ytrue, yprob)
-    gini = 2 * auc - 1
-    return gini
+
+
+
+def cal_eval_binary(ytrue,yprob):
+	'''
+	二分类的一些指标计算 iv,ks,auc
+	ytrue : list or pd.Series 
+	yprob : list or pd.Series 
+	'''
+	fpr, tpr, thr = roc_curve(ytrue, yprob)
+	ks = max(abs(tpr - fpr))
+
+	auc = roc_auc_score(ytrue, yprob)
+	gini = 2 * auc - 1
+
+	recall = metrics.recall()
+
+	# woe ,iv 
+
+
+def cal_bin(df,feature,n_bin=10,is_same_width=True,default_value=None):
+	'''
+	剔除空值
+	is_same_width:True: 等宽 否则 等频
+	'''
+	tmp=df[(df[feature].notna()) & (df[feature] != default_value)]
+	n=tmp[feature].nunique()
+	if n ==0 :
+		return None 
+	if n <= n_bin:
+		f=sorted(tmp[feature].unique().tolist())
+	else:
+		if is_same_width:
+			mi,mx=tmp[feature].min(),v[feature].max()
+			bin_index = [mi+(mx-mi)*i / bin for i in range(0, n_bin + 1)]
+			f=sorted(set(bin_index))
+		else:
+			bin_index = [i / n_bin for i in range(0, n_bin + 1)]
+			f=sorted(set(tmp[feature].quantile(bin_index)))
+	# 包括无穷大，样本集中数据可能有些最小值，最大值不全
+	return f
+
+
+
+
+
 
 
 def cal_bin(df,feature_name,n_bin=10,is_same_width=False,default_value=-1):
     
+    if df.shape[0]==0:
+    	return None 
+
+
     t=df[(df[feature_name].notna()) & (df[feature_name] != default_value)]
     n=t[feature_name].nunique()
-    
-    if n < n_bin:
-        b=sorted(list(df[feature_name].unique()))
-        t['qujian']=pd.cut(t[feature_name],n_bin)
-    else:
-        if is_same_width == False:
-            # 等频
-            a=np.linspace(0,0.9999,n_bin)
-            t['qujian']=pd.qcut(t[feature_name],a,precision=4)
-        else :
-            # 等宽
-            # b=sorted(np.linspace(t[feature_name].min()-0.0001,t[feature_name].max()+0.0001,n_bin))
-            t['qujian']=pd.cut(t[feature_name],n_bin,precision=4)
+
+    if n ==0:
+    	# 只有空数据
+    	return None 
+    f = cal_bin(t,feature_name,n_bin,is_same_width,default_value)
+    if f is None :
+    	return None 
+
+    t['qujian']=pd.cut(t[feature_name], f, include_lowest=True,precision=4)
+
+    # if n < n_bin:
+    #     b=sorted(list(df[feature_name].unique()))
+    #     t['qujian']=pd.cut(t[feature_name],n_bin)
+    # else:
+    #     if is_same_width == False:
+    #         # 等频
+    #         a=np.linspace(0,0.9999,n_bin)
+    #         t['qujian']=pd.qcut(t[feature_name],a,precision=4)
+    #     else :
+    #         # 等宽
+    #         # b=sorted(np.linspace(t[feature_name].min()-0.0001,t[feature_name].max()+0.0001,n_bin))
+    #         t['qujian']=pd.cut(t[feature_name],n_bin,precision=4)
 
     t['qujian_left']=t['qujian'].apply(lambda x:x.left)
     t['qujian_bin']=t['qujian_left'].cat.codes
     t['qujian_left']=t['qujian_left'].astype(float)
     t['qujian_right']=t['qujian'].apply(lambda x:x.right)
     t['qujian_right']=t['qujian_right'].astype(float)
-    # 空处理
-    na=df[(df[feature_name].isna()) | (df[feature_name]==default_value)]
-    if na.shape[0]>0:
-        na['qujian']=-9999999
-        na['qujian_left']=-9999999
-        na['qujian_bin']=-1
-        na['qujian_right']=-9999999
-        t.append(na)
+    
     # t中插入一行
     return t
 
 def cal_univar(df,feature_name,label,n_bin=10,is_same_width=False,default_value=-1):
 	# 默认值--缺失值处理
     df=cal_bin(df,feature_name=feature_name,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
+    if df is None :
+    	return None 
     gp=df.groupby(['qujian']).agg(cnt=(label,'count'),cnt_bad=(label,'sum'),rate_bad=(label,'mean')).reset_index()
     gp['qujian_bin']=gp['qujian'].cat.codes
     gp['qujian_left']=gp['qujian'].apply(lambda x:x.left)
@@ -123,8 +170,12 @@ def cal_univar_by_classes(df,feature_name,label,hue='',n_bin=10,is_same_width=Fa
         for i in ids:
             tmp=df[df[hue]==i]
             gp=cal_univar(tmp,feature_name,label,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
+            if gp is None :
+            	continue 
             gp['hue']=i
             res.append(gp)
+        if len(res) == 0:
+        	return None 
         return pd.concat(res)
     else:
         return cal_univar(df,feature_name,label,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
@@ -132,17 +183,17 @@ def cal_univar_by_classes(df,feature_name,label,hue='',n_bin=10,is_same_width=Fa
 
 
 
-def cal_lift(df,feature_name,label,n_bin=10,cut_method=2):
+def cal_lift(df,feature_name,label,n_bin=10,is_same_width=False):
 	# feature_name: 模型分名称
 	# label: 标签值；默认1为坏用户；0为好用户
-	# cut_method：分组方式；1：等宽；2：等频
+	# is_same_width：分组方式；True：等宽；False：等频
 
 	if df.shape[0] == 0:
 		raise ValueError("df is empty ")
 		return np.nan 
 
 	# fst:数据分组
-	gp=cal_bin(df,feature_name,n_bin,cut_method=cut_method)
+	gp=cal_bin(df,feature_name,n_bin,is_same_width=is_same_width)
 
 	# 所有的bad的用户
 	cnt_bad=df[df[label]==1].shape[0]
