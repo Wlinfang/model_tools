@@ -154,10 +154,9 @@ def cal_bin(df,feature_name,n_bin=10,is_same_width=False,default_value=-1):
 
 def cal_psi(df_base,df_curr,feature_name,n_bin=10,is_same_width=False,default_value=None):
 	'''
-	计算稳定性-- df_base 剔除空值；df_pre 剔除空值
+	计算稳定性-- df_base 剔除空值；df_curr 剔除空值
 	df_base:以base_bin 进行分位
-	df_pre:以base_bin 进行分位
-	base_bin：list
+	df_curr:以df_base 为基准，进行分段
 	'''
 
 	df_base=df_base[(df_base[feature_name].notna()) & (df_base[feature_name] != default_value)]
@@ -196,11 +195,17 @@ def cal_univar(df,feature_name,label,n_bin=10,is_same_width=False,default_value=
 	df=cal_bin(df,feature_name=feature_name,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
 	if df is None :
 		return None 
-	gp=df.groupby(['qujian']).agg(cnt=(label,'count'),cnt_bad=(label,'sum'),rate_bad=(label,'mean')).reset_index()
+	gp=df[df.qujian.notna()].groupby(['qujian']).agg(cnt=(label,'count'),cnt_bad=(label,'sum'),rate_bad=(label,'mean')).reset_index()
+	gp['qujian']=gp['qujian'].astype('category')
 	gp['qujian_bin']=gp['qujian'].cat.codes
+	gp['qujian_bin']=gp['qujian_bin'].astype(int)
 	gp['qujian_left']=gp['qujian'].apply(lambda x:x.left)
 	gp['qujian_left']=gp['qujian_left'].astype(float)
-	
+	na = df[df.qujian.isna()]
+	if na.shape[0] > 0:
+		gp_na=pd.DataFrame([[None,-1,None,na.shape[0],na[label].sum(),na[label].mean()]],columns=['qujian','qujian_bin','qujian_left','cnt','cnt_bad','rate_bad'])
+		gp = pd.concat([gp,gp_na])
+	gp['rate_bad']=np.round(gp['rate_bad'],3)
 	return gp
 
 
