@@ -191,6 +191,10 @@ def cal_psi(df_base,df_curr,feature_name,n_bin=10,is_same_width=False,default_va
 
 
 def cal_univar(df,feature_name,label,n_bin=10,is_same_width=False,default_value=-1):
+
+	if df.shape[0] == 0:
+		print('df is empty')
+		return None 
 	# 默认值--缺失值处理
 	df=cal_bin(df,feature_name=feature_name,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
 	if df is None :
@@ -210,6 +214,9 @@ def cal_univar(df,feature_name,label,n_bin=10,is_same_width=False,default_value=
 
 
 def cal_univar_by_classes(df,feature_name,label,hue='',n_bin=10,is_same_width=False,default_value=-1):
+	if df.shape[0] == 0:
+		print('df is empty')
+		return None 
 	# 计算分组的等频分区
 	if pd.isnull(hue) ==False:
 		res=[]
@@ -229,41 +236,61 @@ def cal_univar_by_classes(df,feature_name,label,hue='',n_bin=10,is_same_width=Fa
 
 
 
-
-def cal_lift(df,feature_name,label,n_bin=10,is_same_width=False):
-	# feature_name: 模型分名称
+def cal_lift(df,feature_name,label,n_bin=10,is_same_width=False,default_value=None):
+	# feature_name: 模型分或特征名称
 	# label: 标签值；默认1为坏用户；0为好用户
 	# is_same_width：分组方式；True：等宽；False：等频
+	# default_value 默认值和缺失值统一为缺失值
 
 	if df.shape[0] == 0:
-		raise ValueError("df is empty ")
-		return np.nan 
+		print('df is empty')
+		return None 
 
-	# fst:数据分组
-	gp=cal_bin(df,feature_name,n_bin,is_same_width=is_same_width)
+	# fst:数据分组,包括空数据和非空数据
+	df=cal_bin(df,feature_name,n_bin,is_same_width=is_same_width,default_value=default_value)
 
 	# 所有的bad的用户
-	cnt_bad=df[df[label]==1].shape[0]
+	cnt_bad=df[label].sum()
 	if cnt_bad==0:
-		raise ValueError("no bad user ")
-		return np.nan 
+		print("no bad user ")
+		return None 
 
-	#对分组数据进行计算
+	
 
-	gp=gp.groupby(['qujian','qujian_right','qujian_bin']).agg(cnt_bad=(label,'sum'),cnt=(label,'count'),bad_rate=(label,'mean')).reset_index()
+	gp=df[df.qujian.notna()].groupby(['qujian']).agg(cnt_bad=(label,'sum'),cnt=(label,'count'),rate_bad=(label,'mean')).reset_index()
+	gp['qujian']=gp['qujian'].astype('category')
+	gp['qujian_bin']=gp['qujian'].cat.codes
+	gp['qujian_bin']=gp['qujian_bin'].astype(int)
+	gp['qujian_left']=gp['qujian'].apply(lambda x:x.left)
+	gp['qujian_left']=gp['qujian_left'].astype(float)
+
 	# 排序，然后进行cum
 	gp.sort_values('qujian_bin',ascending=True,inplace=True)
+	gp['bad_of_total_bad']=np.round(gp['cnt_bad']/cnt_bad,3)
+	gp['cnt_of_total_cnt']=np.round(gp['cnt']/df.shape[0],3)
 	gp['cum_bad']=gp['cnt_bad'].cumsum()
 	gp['cum_cnt']=gp['cnt'].cumsum()
 	# 计算 占比； bad 占所有的bad 比例 与 累计总样本
 	gp['cum_bad_of_total_bad']=np.round(gp['cum_bad']/cnt_bad,3)
 	gp['cum_cnt_of_total_cnt']=np.round(gp['cum_cnt']/df.shape[0],3)
 	# lift ,如果 >1 则有识别；if < 1；则无识别
-	gp['lift']=np.round(gp['cum_bad_of_total_bad']/gp['cum_cnt_of_total_cnt'],2)
-	gp['feature']=feature_name
+	gp['lift']=np.round(gp['cum_bad_of_total_bad']/gp['cum_cnt_of_total_cnt'],3)
 
-	out_cols=[['feature','qujian','qujian_bin','qujian_right','bad_rate','cnt_bad','cum_bad','cum_bad_of_total_bad','cnt','cum_cnt','cum_cnt_of_total_cnt','lift']]
+	out_cols=['qujian','qujian_bin','qujian_left','rate_bad','cnt_bad',
+	'cnt_of_total_cnt','bad_of_total_bad','cum_bad','cum_bad_of_total_bad','cnt','cum_cnt','cum_cnt_of_total_cnt','lift']
 
+	#空和非空单独计算
+	gp_na = df[df.qujian.isna()]
+	if gp_na.shape[0] > 0:
+		gp_na= pd.DataFrame([[None,-1,None,np.round(gp_na[label].mean(),3),
+			gp_na[label].sum(),np.round(gp_na.shape[0]/df.shape[0],3),
+			np.round(gp_na[label].sum()/cnt_bad,3),gp_na[label].sum(),np.round(gp_na[label].sum()/cnt_bad,3),
+			gp_na.shape[0],gp_na.shape[0],np.round(gp_na.shape[0]/df.shape[0],3),
+			np.round((gp_na[label].sum() / cnt_bad)/(gp_na.shape[0]/df.shape[0]),3)
+			]],columns=out_cols)
+
+		gp=pd.concat([gp,gp_na])
+		
 	return gp[out_cols] 
 
 
