@@ -112,7 +112,7 @@ def cal_feature_grid(df,feature_name,n_bin=10,is_same_width=True,default_value=N
 
 def cal_bin(df,feature_name,n_bin=10,is_same_width=False,default_value=-1):
 	
-	f = cal_feature_grid(t,feature_name,n_bin,is_same_width,default_value)
+	f = cal_feature_grid(df,feature_name,n_bin,is_same_width,default_value)
 	if f is None :
 		return None 
 	# 分为空和非空
@@ -255,8 +255,6 @@ def cal_lift(df,feature_name,label,n_bin=10,is_same_width=False,default_value=No
 		print("no bad user ")
 		return None 
 
-	
-
 	gp=df[df.qujian.notna()].groupby(['qujian']).agg(cnt_bad=(label,'sum'),cnt=(label,'count'),rate_bad=(label,'mean')).reset_index()
 	gp['qujian']=gp['qujian'].astype('category')
 	gp['qujian_bin']=gp['qujian'].cat.codes
@@ -290,7 +288,7 @@ def cal_lift(df,feature_name,label,n_bin=10,is_same_width=False,default_value=No
 			]],columns=out_cols)
 
 		gp=pd.concat([gp,gp_na])
-		
+
 	return gp[out_cols] 
 
 
