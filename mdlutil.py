@@ -64,23 +64,6 @@ def get_iv(cls, df_label, df_feature):
 
 
 
-def cal_eval_binary(ytrue,yprob):
-	'''
-	二分类的一些指标计算 iv,ks,auc
-	ytrue : list or pd.Series 
-	yprob : list or pd.Series 
-	'''
-	fpr, tpr, thr = roc_curve(ytrue, yprob)
-	ks = max(abs(tpr - fpr))
-
-	auc = roc_auc_score(ytrue, yprob)
-	gini = 2 * auc - 1
-
-	recall = metrics.recall()
-
-	# woe ,iv 
-
-
 def cal_feature_grid(df,feature_name,n_bin=10,is_same_width=True,default_value=None):
 	'''
 	剔除空值或默认值
