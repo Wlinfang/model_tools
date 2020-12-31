@@ -123,7 +123,6 @@ def cal_feature_grid(df,feature_name,n_bin=10,is_same_width=True,default_value=N
 	'''
 	剔除空值或默认值
 	is_same_width:True: 等宽 否则 等频
-
 	'''
 	if df is None:
 		return None 
@@ -148,44 +147,33 @@ def cal_feature_grid(df,feature_name,n_bin=10,is_same_width=True,default_value=N
 	f[-1]=np.inf
 	return f
 
-def cal_bin(df,feature_name,n_bin=10,is_same_width=False,default_value=-1):
-	
-	f = cal_feature_grid(df,feature_name,n_bin,is_same_width,default_value)
-	if f is None :
+def cal_bin(df,feature_name,feature_grid=[],n_bin=10,is_same_width=False,default_value=-1):
+
+	if df.shape[0]==0:
 		return None 
+	if len(feature_grid) == 0:
+		feature_grid = cal_feature_grid(df,feature_name,n_bin,is_same_width,default_value)
+		if feature_grid is None :
+			return None 
+	feature_grid = sorted(feature_grid)
 	# 分为空和非空
 	t1 = df[(df[feature_name].notna()) & (df[feature_name] != default_value)].copy()
 	# t2 是一个copy 数据设置有warnning，进行copy可以消除，断开同源数据的联系
 	t2 = df[(df[feature_name].isna()) | (df[feature_name] == default_value)].copy()
 	del df 
-	t1['qujian']=pd.cut(t1[feature_name], f, include_lowest=True,precision=4)
+	t1['qujian']=pd.cut(t1[feature_name], feature_grid, include_lowest=True,precision=4)
 
-	# if n < n_bin:
-	#	 b=sorted(list(df[feature_name].unique()))
-	#	 t['qujian']=pd.cut(t[feature_name],n_bin)
-	# else:
-	#	 if is_same_width == False:
-	#		 # 等频
-	#		 a=np.linspace(0,0.9999,n_bin)
-	#		 t['qujian']=pd.qcut(t[feature_name],a,precision=4)
-	#	 else :
-	#		 # 等宽
-	#		 # b=sorted(np.linspace(t[feature_name].min()-0.0001,t[feature_name].max()+0.0001,n_bin))
-	#		 t['qujian']=pd.cut(t[feature_name],n_bin,precision=4)
 	t1['qujian_bin']=t1['qujian'].cat.codes
 	t1['qujian_bin']=t1['qujian_bin'].astype(int)
 	t1['qujian_left']=t1['qujian'].apply(lambda x:x.left)
 	t1['qujian_left']=t1['qujian_left'].astype(float)
-	t1['qujian_right']=t1['qujian'].apply(lambda x:x.right)
-	t1['qujian_right']=t1['qujian_right'].astype(float)
 
 	# 如果 df['qujian'] 为空，则为缺失值
 	if t2.shape[0] > 0:
 		print('miss data ')
 		t2['qujian']=None
 		t2['qujian_bin']=-1
-		t2['qujian_right']=None 
-		t2['qujian_right']=None 
+		t2['qujian_left']=None 
 		return pd.concat([t1,t2])
 	return t1 
 
@@ -207,7 +195,7 @@ def cal_psi(df_base,df_curr,feature_name,n_bin=10,is_same_width=False,default_va
 		print('shape of df_curr is {}'.format(df_curr.shape[0]))
 		return None 
 
-	f=cal_feature_grid(df_base,feature_name,n_bin,is_same_width,default_value)
+	f=cal_feature_grid(df=df_base,feature_name=feature_name,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
 	df_base['lbl'] = pd.cut(df_base[feature_name], f, include_lowest=True)
 	df_base['lbl_index'] = df_base['lbl'].cat.codes
 	base_gp=df_base.groupby(['lbl_index'])[feature_name].count().reset_index().rename(columns={feature_name:'base_cnt'})
@@ -228,54 +216,10 @@ def cal_psi(df_base,df_curr,feature_name,n_bin=10,is_same_width=False,default_va
 
 
 
-def cal_univar(df,feature_name,label,n_bin=10,is_same_width=False,default_value=-1):
 
-	if df.shape[0] == 0:
-		print('df is empty')
-		return None 
-	# 默认值--缺失值处理
-	df=cal_bin(df,feature_name=feature_name,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
-	if df is None :
-		return None 
-	gp=df[df.qujian.notna()].groupby(['qujian']).agg(cnt=(label,'count'),cnt_bad=(label,'sum'),rate_bad=(label,'mean')).reset_index()
-	gp['qujian']=gp['qujian'].astype('category')
-	gp['qujian_bin']=gp['qujian'].cat.codes
-	gp['qujian_bin']=gp['qujian_bin'].astype(int)
-	gp['qujian_left']=gp['qujian'].apply(lambda x:x.left)
-	gp['qujian_left']=gp['qujian_left'].astype(float)
-	na = df[df.qujian.isna()]
-	if na.shape[0] > 0:
-		gp_na=pd.DataFrame([[None,-1,None,na.shape[0],na[label].sum(),na[label].mean()]],columns=['qujian','qujian_bin','qujian_left','cnt','cnt_bad','rate_bad'])
-		gp = pd.concat([gp,gp_na])
-	gp['rate_bad']=np.round(gp['rate_bad'],3)
-	return gp
-
-
-def cal_univar_by_classes(df,feature_name,label,hue='',n_bin=10,is_same_width=False,default_value=-1):
-	if df.shape[0] == 0:
-		print('df is empty')
-		return None 
-	# 计算分组的等频分区
-	if pd.isnull(hue) ==False:
-		res=[]
-		ids=df[hue].unique().tolist()
-		for i in ids:
-			tmp=df[df[hue]==i]
-			gp=cal_univar(tmp,feature_name,label,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
-			if gp is None :
-				continue 
-			gp['hue']=i
-			res.append(gp)
-		if len(res) == 0:
-			return None 
-		return pd.concat(res)
-	else:
-		return cal_univar(df,feature_name,label,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
-
-
-
-def cal_lift(df,feature_name,label,n_bin=10,is_same_width=False,default_value=None):
+def cal_lift(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,default_value=None):
 	# feature_name: 模型分或特征名称
+	# feature_grid: 模型分组； 如果不为空，则按照feature_grid分bin；否则按照原规则进行
 	# label: 标签值；默认1为坏用户；0为好用户
 	# is_same_width：分组方式；True：等宽；False：等频
 	# default_value 默认值和缺失值统一为缺失值
@@ -328,6 +272,56 @@ def cal_lift(df,feature_name,label,n_bin=10,is_same_width=False,default_value=No
 		gp=pd.concat([gp,gp_na])
 
 	return gp[out_cols] 
+
+
+def cal_lift_by_classes(df,feature_name,label,hue='',n_bin=10,is_same_width=False,default_value=-1):
+	'''
+	每组分别分组，即区间范围不一样
+	'''
+	if df.shape[0] == 0:
+		print('df is empty')
+		return None 
+	# 计算分组的等频分区
+	if pd.isnull(hue) ==False:
+		res=[]
+		ids=df[hue].unique().tolist()
+		for i in ids:
+			tmp=df[df[hue]==i]
+			gp=cal_lift(tmp,feature_name,label,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
+			if gp is None :
+				continue 
+			gp['hue']=i
+			res.append(gp)
+		if len(res) == 0:
+			return None 
+		return pd.concat(res)
+	else:
+		return cal_lift(df,feature_name,label,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
+
+
+def cal_liftr_with_same_bin(df,feature_name,label,hue='',feature_grid=[],n_bin=10,is_same_width=False,default_value=-1):
+	'''
+	使用统一的bin数据；如果feature_grid 为空，默认使用全量数据计算feature_grid；否则使用feature_grid
+	feature_grid:list 分组的
+	'''
+	if df.shape[0] == 0:
+		return None 
+	if len(feature_grid)==0:
+		feature_grid = cal_feature_grid(df,feature_name,n_bin,is_same_width,default_value)
+		if f is None :
+			return None 
+	df['qujian']=pd.cut(df[feature_name], feature_grid, include_lowest=True,precision=4)
+	# 分为
+	if 
+
+
+
+
+
+
+
+
+
 
 
 
