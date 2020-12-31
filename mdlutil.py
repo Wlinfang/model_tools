@@ -28,6 +28,31 @@ def cal_week(df,date_name,date_name_new):
 	df[date_name_new] = pd.to_datetime(df[date_name_new]).dt.date
 	return df
 
+def cal_month(df,date_name,date_name_new):
+	'''
+	:param df: dateframe
+	:param date_name: date
+	:param date_name_new：月份名称
+	:return: %y-%m
+	'''
+	columns=df.columns.tolist()
+	if date_name not in columns:
+		raise('not found %' % date_name)
+	df[date_name]=pd.to_datetime(df[date_name])
+	df[date_name_new]=df[date_name].dt.strftime('%y-%m')
+	return df
+
+def parse_timestamp(df,date_name,date_name_new):
+	'''
+	日期转时间戳
+	date_name:原时间名称
+	date_name_new:时间戳的name
+	'''
+	df[date_name]=pd.to_datetime(df[date_name])
+	df[date_name]=df[date_name].astype(str)
+	df[date_name_new]=df[date_time].apply(lambda x:time.mktime(time.strptime(x,'%Y-%m-%d %H:%M:%S')))
+	return df
+
 
 def get_stat(cls, df_data,feature_name,label_name,n_bin=10,qcut_method=1):
 	'''
