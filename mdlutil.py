@@ -54,6 +54,36 @@ def parse_timestamp(df,date_name,date_name_new):
 	return df
 
 
+def cal_describe(df,feature_name_list):
+	'''
+	计算特征描述性分析 包括cnt,缺失率，方差，分位数，众数，众数占比
+	众数限制为1个的情况，如果多个众数，则不进行计算
+	return df:
+	'''
+	# 提取数字型数据
+	feature_name_list=df[feature_name_list].select_dtypes(include=np.number).columns.tolist()
+	
+	gp=df[feature_name_list].describe().T
+	# 取近似值了
+	gp['all_count']=df.shape[0]
+	gp['miss_rate']=np.round(1-gp['count']/df.shape[0],3)	
+	gp=gp[['all_count','count', 'miss_rate', 'mean', 'std', 'min', '25%', '50%', '75%', 'max']]
+	gp=gp.join(df[feature_name_list].nunique(axis=0).to_frame().rename(columns={0:'nunique'}))
+	gp=gp.reset_index().rename(columns={'index':'feature_name'})
+	a=df[feature_name_list].mode(axis=0).T.reset_index()
+	if a.shape[0] >0 :
+		a.columns=['feature_name','mode']
+		gp=gp.merge(a,how='left')
+		# 众数占有值的比例
+		gp['mode_count']=gp.apply(lambda x:df[df[x.feature_name]==x['mode']].shape[0],axis=1)
+		gp['mode_rate']=np.round(gp['mode_count']/gp['count'],3)
+	else:
+		gp['mode']=None
+		gp['mode_count']=None
+		gp['mode_rate']=None
+	return gp
+
+
 def get_stat(cls, df_data,feature_name,label_name,n_bin=10,qcut_method=1):
 	'''
 	如果是离散值，则根据离散值进行划分
