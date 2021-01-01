@@ -121,6 +121,9 @@ def cal_bin(df,feature_name,feature_grid=[],n_bin=10,is_same_width=False,default
 	feature_grid：分段区间；如果为空，则根据 n_bin=10,•is_same_width=False 计算得到
 	'''
 
+	if (df is None) or (df.shape[0]==0):
+		return None 
+
 	if len(feature_grid) == 0:
 		feature_grid = cal_feature_grid(df,feature_name,n_bin,is_same_width,default_value)
 		if feature_grid is None :
@@ -148,6 +151,87 @@ def cal_bin(df,feature_name,feature_grid=[],n_bin=10,is_same_width=False,default
 	return t1 
 
 
+def cal_psi(df_base,df_curr,feature_name,n_bin=10,is_same_width=False,default_value=None):
+	'''
+	计算稳定性-- df_base 剔除空值；df_curr 剔除空值
+	df_base:以base_bin 进行分位
+	df_curr:以df_base 为基准，进行分段
+	'''
+
+	df_base=df_base[(df_base[feature_name].notna()) & (df_base[feature_name] != default_value)]
+	if df_base.shape[0] == 0:
+		print('shape of df_base is {}'.format(df_base.shape[0]))
+		return None 
+
+	df_curr=df_curr[(df_curr[feature_name].notna()) & (df_curr[feature_name] != default_value)]
+	if df_curr.shape[0] == 0:
+		print('shape of df_curr is {}'.format(df_curr.shape[0]))
+		return None 
+
+	f=cal_feature_grid(df=df_base,feature_name=feature_name,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
+	df_base['lbl'] = pd.cut(df_base[feature_name], f, include_lowest=True)
+	df_base['lbl_index'] = df_base['lbl'].cat.codes
+	base_gp=df_base.groupby(['lbl_index'])[feature_name].count().reset_index().rename(columns={feature_name:'base_cnt'})
+	base_gp['base_rate']=np.round(base_gp['base_cnt']/df_base.shape[0],4)
+
+	df_curr['lbl'] = pd.cut(df_curr[feature_name], f, include_lowest=True)
+	df_curr['lbl_index'] = df_curr['lbl'].cat.codes
+	curr_gp=df_curr.groupby(['lbl_index'])[feature_name].count().reset_index().rename(columns={feature_name:'curr_cnt'})
+	curr_gp['curr_rate']=np.round(curr_gp['curr_cnt']/df_curr.shape[0],4)
+
+	# psi 分组计算求和，分组公式=(base_rate-pre_rate) * ln(base_rate/pre_rate)
+	gp=pd.merge(base_gp,curr_gp,on=['lbl_index'],how='outer')
+	gp['psi']=(gp.base_rate-gp.curr_rate) * np.log(gp.base_rate/gp.curr_rate)
+	gp['psi']=np.round(gp['psi'],4)
+	gp.loc[gp.curr_rate==0,'psi']=0
+	del df_base,df_curr,curr_gp,base_gp
+	return gp['psi'].sum()
+
+
+
+def cal_lift(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,default_value=None):
+	# feature_name: 模型分或特征名称
+	# feature_grid: 模型分组； 如果不为空，则按照feature_grid分bin；否则按照原规则进行
+	# label: 标签值；默认1为坏用户；0为好用户
+	# is_same_width：分组方式；True：等宽；False：等频
+	# default_value 默认值和缺失值统一为缺失值
+
+
+	# fst:数据分组,包括空数据和非空数据
+	df=cal_bin(df=df,feature_name=feature_name,feature_grid=feature_grid,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
+
+	# 所有的bad的用户
+	cnt_bad=df[label].sum()
+	if cnt_bad==0:
+		print("no bad user ")
+		return None 
+
+	# 包括了缺失值
+	gp=df.groupby(['qujian']).agg(cnt_bad=(label,'sum'),cnt=(label,'count'),rate_bad=(label,'mean')).reset_index()
+	
+	gp['qujian']=gp['qujian'].astype('category')
+	gp['qujian_bin']=gp['qujian'].apply(lambda x: -1 if x=='缺失值' else x.cat.codes)
+	gp['qujian_bin']=gp['qujian_bin'].astype(int)
+	gp['qujian_left']=gp['qujian'].apply(lambda x: None if x== '缺失值' else x.left)
+	gp['qujian_left']=gp['qujian_left'].astype(float)
+
+	# 排序，然后进行cum
+	gp.sort_values('qujian_bin',ascending=True,inplace=True)
+	gp['bad_of_total_bad']=np.round(gp['cnt_bad']/cnt_bad,3)
+	gp['cnt_of_total_cnt']=np.round(gp['cnt']/df.shape[0],3)
+	gp['cum_bad']=gp['cnt_bad'].cumsum()
+	gp['cum_cnt']=gp['cnt'].cumsum()
+	# 计算 占比； bad 占所有的bad 比例 与 累计总样本
+	gp['cum_bad_of_total_bad']=np.round(gp['cum_bad']/cnt_bad,3)
+	gp['cum_cnt_of_total_cnt']=np.round(gp['cum_cnt']/df.shape[0],3)
+	# lift ,如果 >1 则有识别；if < 1；则无识别
+	gp['lift']=np.round(gp['cum_bad_of_total_bad']/gp['cum_cnt_of_total_cnt'],3)
+
+	out_cols=['qujian','qujian_bin','qujian_left','rate_bad','cnt_bad',
+	'cnt_of_total_cnt','bad_of_total_bad','cum_bad','cum_bad_of_total_bad',
+	'cnt','cum_cnt','cum_cnt_of_total_cnt','lift']
+
+	return gp[out_cols] 
 
 
 def get_stat(cls, df_data,feature_name,label_name,n_bin=10,qcut_method=1):
@@ -190,100 +274,12 @@ def get_iv(cls, df_label, df_feature):
 
 
 
-def cal_psi(df_base,df_curr,feature_name,n_bin=10,is_same_width=False,default_value=None):
-	'''
-	计算稳定性-- df_base 剔除空值；df_curr 剔除空值
-	df_base:以base_bin 进行分位
-	df_curr:以df_base 为基准，进行分段
-	'''
-
-	df_base=df_base[(df_base[feature_name].notna()) & (df_base[feature_name] != default_value)]
-	if df_base.shape[0] == 0:
-		print('shape of df_base is {}'.format(df_base.shape[0]))
-		return None 
-
-	df_curr=df_curr[(df_curr[feature_name].notna()) & (df_curr[feature_name] != default_value)]
-	if df_curr.shape[0] == 0:
-		print('shape of df_curr is {}'.format(df_curr.shape[0]))
-		return None 
-
-	f=cal_feature_grid(df=df_base,feature_name=feature_name,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
-	df_base['lbl'] = pd.cut(df_base[feature_name], f, include_lowest=True)
-	df_base['lbl_index'] = df_base['lbl'].cat.codes
-	base_gp=df_base.groupby(['lbl_index'])[feature_name].count().reset_index().rename(columns={feature_name:'base_cnt'})
-	base_gp['base_rate']=np.round(base_gp['base_cnt']/df_base.shape[0],4)
-
-	df_curr['lbl'] = pd.cut(df_curr[feature_name], f, include_lowest=True)
-	df_curr['lbl_index'] = df_curr['lbl'].cat.codes
-	curr_gp=df_curr.groupby(['lbl_index'])[feature_name].count().reset_index().rename(columns={feature_name:'curr_cnt'})
-	curr_gp['curr_rate']=np.round(curr_gp['curr_cnt']/df_curr.shape[0],4)
-
-	# psi 分组计算求和，分组公式=(base_rate-pre_rate) * ln(base_rate/pre_rate)
-	gp=pd.merge(base_gp,curr_gp,on=['lbl_index'],how='outer')
-	gp['psi']=(gp.base_rate-gp.curr_rate) * np.log(gp.base_rate/gp.curr_rate)
-	gp['psi']=np.round(gp['psi'],4)
-	gp.loc[gp.curr_rate==0,'psi']=0
-	del df_base,df_curr,curr_gp,base_gp
-	return gp['psi'].sum()
 
 
 
 
-def cal_lift(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,default_value=None):
-	# feature_name: 模型分或特征名称
-	# feature_grid: 模型分组； 如果不为空，则按照feature_grid分bin；否则按照原规则进行
-	# label: 标签值；默认1为坏用户；0为好用户
-	# is_same_width：分组方式；True：等宽；False：等频
-	# default_value 默认值和缺失值统一为缺失值
 
-	if df.shape[0] == 0:
-		print('df is empty')
-		return None 
 
-	# fst:数据分组,包括空数据和非空数据
-	df=cal_bin(df,feature_name,n_bin,is_same_width=is_same_width,default_value=default_value)
-
-	# 所有的bad的用户
-	cnt_bad=df[label].sum()
-	if cnt_bad==0:
-		print("no bad user ")
-		return None 
-
-	gp=df[df.qujian.notna()].groupby(['qujian']).agg(cnt_bad=(label,'sum'),cnt=(label,'count'),rate_bad=(label,'mean')).reset_index()
-	gp['qujian']=gp['qujian'].astype('category')
-	gp['qujian_bin']=gp['qujian'].cat.codes
-	gp['qujian_bin']=gp['qujian_bin'].astype(int)
-	gp['qujian_left']=gp['qujian'].apply(lambda x:x.left)
-	gp['qujian_left']=gp['qujian_left'].astype(float)
-
-	# 排序，然后进行cum
-	gp.sort_values('qujian_bin',ascending=True,inplace=True)
-	gp['bad_of_total_bad']=np.round(gp['cnt_bad']/cnt_bad,3)
-	gp['cnt_of_total_cnt']=np.round(gp['cnt']/df.shape[0],3)
-	gp['cum_bad']=gp['cnt_bad'].cumsum()
-	gp['cum_cnt']=gp['cnt'].cumsum()
-	# 计算 占比； bad 占所有的bad 比例 与 累计总样本
-	gp['cum_bad_of_total_bad']=np.round(gp['cum_bad']/cnt_bad,3)
-	gp['cum_cnt_of_total_cnt']=np.round(gp['cum_cnt']/df.shape[0],3)
-	# lift ,如果 >1 则有识别；if < 1；则无识别
-	gp['lift']=np.round(gp['cum_bad_of_total_bad']/gp['cum_cnt_of_total_cnt'],3)
-
-	out_cols=['qujian','qujian_bin','qujian_left','rate_bad','cnt_bad',
-	'cnt_of_total_cnt','bad_of_total_bad','cum_bad','cum_bad_of_total_bad','cnt','cum_cnt','cum_cnt_of_total_cnt','lift']
-
-	#空和非空单独计算
-	gp_na = df[df.qujian.isna()]
-	if gp_na.shape[0] > 0:
-		gp_na= pd.DataFrame([[None,-1,None,np.round(gp_na[label].mean(),3),
-			gp_na[label].sum(),np.round(gp_na.shape[0]/df.shape[0],3),
-			np.round(gp_na[label].sum()/cnt_bad,3),gp_na[label].sum(),np.round(gp_na[label].sum()/cnt_bad,3),
-			gp_na.shape[0],gp_na.shape[0],np.round(gp_na.shape[0]/df.shape[0],3),
-			np.round((gp_na[label].sum() / cnt_bad)/(gp_na.shape[0]/df.shape[0]),3)
-			]],columns=out_cols)
-
-		gp=pd.concat([gp,gp_na])
-
-	return gp[out_cols] 
 
 
 def cal_lift_by_classes(df,feature_name,label,hue='',n_bin=10,is_same_width=False,default_value=-1):
