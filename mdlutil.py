@@ -142,13 +142,17 @@ def cal_feature_grid(df,feature_name,n_bin=10,is_same_width=True,default_value=N
 		else:
 			bin_index = [i / n_bin for i in range(0, n_bin + 1)]
 			f=sorted(set(tmp[feature_name].quantile(bin_index)))
-	#TODO 包括无穷大，样本集中数据可能有些最小值，最大值不全
+	# 包括无穷大，样本集中数据可能有些最小值，最大值不全
 	f[0]=-np.Inf
 	f[-1]=np.inf
 	return f
 
 def cal_bin(df,feature_name,feature_grid=[],n_bin=10,is_same_width=False,default_value=-1):
-
+	
+	'''
+	feature_grid：分段区间；如果为空，则根据 n_bin=10,•is_same_width=False 计算得到
+	'''
+	
 	if df.shape[0]==0:
 		return None 
 	if len(feature_grid) == 0:
