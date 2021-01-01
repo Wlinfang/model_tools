@@ -114,6 +114,42 @@ def cal_feature_grid(df,feature_name,n_bin=10,is_same_width=True,default_value=N
 	return np.round(f,3)
 
 
+def cal_bin(df,feature_name,feature_grid=[],n_bin=10,is_same_width=False,default_value=-1):
+	
+	'''
+	对 df中的每笔明细划分区间
+	feature_grid：分段区间；如果为空，则根据 n_bin=10,•is_same_width=False 计算得到
+	'''
+
+	if len(feature_grid) == 0:
+		feature_grid = cal_feature_grid(df,feature_name,n_bin,is_same_width,default_value)
+		if feature_grid is None :
+			return None 
+	feature_grid = sorted(feature_grid)
+	# 分为空和非空
+	t1 = df[(df[feature_name].notna()) & (df[feature_name] != default_value)].copy()
+	# t2 是一个copy 数据设置有warnning，进行copy可以消除，断开同源数据的联系
+	t2 = df[(df[feature_name].isna()) | (df[feature_name] == default_value)].copy()
+	del df 
+	t1['qujian']=pd.cut(t1[feature_name], feature_grid, include_lowest=True,precision=4)
+
+	t1['qujian_bin']=t1['qujian'].cat.codes
+	t1['qujian_bin']=t1['qujian_bin'].astype(int)
+	t1['qujian_left']=t1['qujian'].apply(lambda x:x.left)
+	t1['qujian_left']=t1['qujian_left'].astype(float)
+
+	# 如果 df['qujian'] 为空，则为缺失值
+	if t2.shape[0] > 0:
+		print('miss data ')
+		t2['qujian']='缺失值'
+		t2['qujian_bin']=-1
+		t2['qujian_left']=None 
+		return pd.concat([t1,t2])
+	return t1 
+
+
+
+
 def get_stat(cls, df_data,feature_name,label_name,n_bin=10,qcut_method=1):
 	'''
 	如果是离散值，则根据离散值进行划分
@@ -151,39 +187,7 @@ def get_iv(cls, df_label, df_feature):
 
 
 
-def cal_bin(df,feature_name,feature_grid=[],n_bin=10,is_same_width=False,default_value=-1):
-	
-	'''
-	feature_grid：分段区间；如果为空，则根据 n_bin=10,•is_same_width=False 计算得到
-	'''
-	
-	if df.shape[0]==0:
-		return None 
-	if len(feature_grid) == 0:
-		feature_grid = cal_feature_grid(df,feature_name,n_bin,is_same_width,default_value)
-		if feature_grid is None :
-			return None 
-	feature_grid = sorted(feature_grid)
-	# 分为空和非空
-	t1 = df[(df[feature_name].notna()) & (df[feature_name] != default_value)].copy()
-	# t2 是一个copy 数据设置有warnning，进行copy可以消除，断开同源数据的联系
-	t2 = df[(df[feature_name].isna()) | (df[feature_name] == default_value)].copy()
-	del df 
-	t1['qujian']=pd.cut(t1[feature_name], feature_grid, include_lowest=True,precision=4)
 
-	t1['qujian_bin']=t1['qujian'].cat.codes
-	t1['qujian_bin']=t1['qujian_bin'].astype(int)
-	t1['qujian_left']=t1['qujian'].apply(lambda x:x.left)
-	t1['qujian_left']=t1['qujian_left'].astype(float)
-
-	# 如果 df['qujian'] 为空，则为缺失值
-	if t2.shape[0] > 0:
-		print('miss data ')
-		t2['qujian']=None
-		t2['qujian_bin']=-1
-		t2['qujian_left']=None 
-		return pd.concat([t1,t2])
-	return t1 
 
 
 def cal_psi(df_base,df_curr,feature_name,n_bin=10,is_same_width=False,default_value=None):
