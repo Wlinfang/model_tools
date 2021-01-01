@@ -92,9 +92,7 @@ def cal_feature_grid(df,feature_name,n_bin=10,is_same_width=True,default_value=N
 	计算分组，剔除空值或默认值后剩余的数据进行分组；空值和默认值为单独一个组
 	is_same_width:True: 等宽 否则 等频
 	'''
-	if df is None:
-		return None 
-	if df.shape[0] ==0:
+	if (df is None)  or (df.shape[0] ==0) or (n_bin <= 0):
 		return None 
 	tmp=df[(df[feature_name].notna()) & (df[feature_name] != default_value)]
 	n=tmp[feature_name].nunique()
@@ -113,7 +111,7 @@ def cal_feature_grid(df,feature_name,n_bin=10,is_same_width=True,default_value=N
 	# 包括无穷大，样本集中数据可能有些最小值，最大值不全
 	f[0]=-np.Inf
 	f[-1]=np.inf
-	return f
+	return np.round(f,3)
 
 
 def get_stat(cls, df_data,feature_name,label_name,n_bin=10,qcut_method=1):
