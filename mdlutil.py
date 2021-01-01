@@ -7,8 +7,7 @@ warnings.filterwarnings('ignore')
 import statsmodels.api as sm
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from sklearn.base import TransformerMixin, BaseEstimator, ClassifierMixin
-from sklearn.metrics import roc_auc_score, roc_curve
-from enum import Enum
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -68,6 +67,9 @@ def cal_describe(df,feature_name_list):
 	gp['all_count']=df.shape[0]
 	gp['miss_rate']=np.round(1-gp['count']/df.shape[0],3)	
 	gp=gp[['all_count','count', 'miss_rate', 'mean', 'std', 'min', '25%', '50%', '75%', 'max']]
+	
+	gp[['miss_rate', 'mean', 'std', 'min', '25%', '50%', '75%', 'max']]=np.round(gp[['miss_rate', 'mean', 'std', 'min', '25%', '50%', '75%', 'max']],3)
+
 	gp=gp.join(df[feature_name_list].nunique(axis=0).to_frame().rename(columns={0:'nunique'}))
 	gp=gp.reset_index().rename(columns={'index':'feature_name'})
 	a=df[feature_name_list].mode(axis=0).T.reset_index()
@@ -82,6 +84,36 @@ def cal_describe(df,feature_name_list):
 		gp['mode_count']=None
 		gp['mode_rate']=None
 	return gp
+
+
+
+def cal_feature_grid(df,feature_name,n_bin=10,is_same_width=True,default_value=None):
+	'''
+	计算分组，剔除空值或默认值后剩余的数据进行分组；空值和默认值为单独一个组
+	is_same_width:True: 等宽 否则 等频
+	'''
+	if df is None:
+		return None 
+	if df.shape[0] ==0:
+		return None 
+	tmp=df[(df[feature_name].notna()) & (df[feature_name] != default_value)]
+	n=tmp[feature_name].nunique()
+	if n ==0 :
+		return None 
+	if n <= n_bin:
+		f=sorted(tmp[feature_name].unique().tolist())
+	else:
+		if is_same_width:
+			mi,mx=tmp[feature_name].min(),tmp[feature_name].max()
+			bin_index = [mi+(mx-mi)*i / n_bin for i in range(0, n_bin + 1)]
+			f=sorted(set(bin_index))
+		else:
+			bin_index = [i / n_bin for i in range(0, n_bin + 1)]
+			f=sorted(set(tmp[feature_name].quantile(bin_index)))
+	# 包括无穷大，样本集中数据可能有些最小值，最大值不全
+	f[0]=-np.Inf
+	f[-1]=np.inf
+	return f
 
 
 def get_stat(cls, df_data,feature_name,label_name,n_bin=10,qcut_method=1):
@@ -119,33 +151,7 @@ def get_iv(cls, df_label, df_feature):
 
 
 
-def cal_feature_grid(df,feature_name,n_bin=10,is_same_width=True,default_value=None):
-	'''
-	剔除空值或默认值
-	is_same_width:True: 等宽 否则 等频
-	'''
-	if df is None:
-		return None 
-	if df.shape[0] ==0:
-		return None 
-	tmp=df[(df[feature_name].notna()) & (df[feature_name] != default_value)]
-	n=tmp[feature_name].nunique()
-	if n ==0 :
-		return None 
-	if n <= n_bin:
-		f=sorted(tmp[feature_name].unique().tolist())
-	else:
-		if is_same_width:
-			mi,mx=tmp[feature_name].min(),v[feature_name].max()
-			bin_index = [mi+(mx-mi)*i / bin for i in range(0, n_bin + 1)]
-			f=sorted(set(bin_index))
-		else:
-			bin_index = [i / n_bin for i in range(0, n_bin + 1)]
-			f=sorted(set(tmp[feature_name].quantile(bin_index)))
-	# 包括无穷大，样本集中数据可能有些最小值，最大值不全
-	f[0]=-np.Inf
-	f[-1]=np.inf
-	return f
+
 
 def cal_bin(df,feature_name,feature_grid=[],n_bin=10,is_same_width=False,default_value=-1):
 	
