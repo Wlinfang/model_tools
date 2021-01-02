@@ -135,7 +135,7 @@ def cal_bin(df,feature_name,feature_grid=[],n_bin=10,is_same_width=False,default
 	t2 = df[(df[feature_name].isna()) | (df[feature_name] == default_value)].copy()
 	del df 
 	t1['qujian']=pd.cut(t1[feature_name], feature_grid, include_lowest=True,precision=4)
-
+	t1['qujian']=t1['qujian'].astype('category')
 	t1['qujian_bin']=t1['qujian'].cat.codes
 	t1['qujian_bin']=t1['qujian_bin'].astype(int)
 	t1['qujian_left']=t1['qujian'].apply(lambda x:x.left)
@@ -210,10 +210,11 @@ def cal_lift(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,
 	gp=df.groupby(['qujian']).agg(cnt_bad=(label,'sum'),cnt=(label,'count'),rate_bad=(label,'mean')).reset_index()
 	
 	gp['qujian']=gp['qujian'].astype('category')
-	gp['qujian_bin']=gp['qujian'].apply(lambda x: -1 if x=='缺失值' else x.cat.codes)
+	gp['qujian_bin']=gp['qujian'].cat.codes 
+	gp.loc[gp['qujian']=='缺失值','qujian_bin']=-1
 	gp['qujian_bin']=gp['qujian_bin'].astype(int)
-	gp['qujian_left']=gp['qujian'].apply(lambda x: None if x== '缺失值' else x.left)
-	gp['qujian_left']=gp['qujian_left'].astype(float)
+	gp['qujian_left']=gp['qujian'].apply(lambda x: '缺失值' if x== '缺失值' else float(x.left))
+	
 
 	# 排序，然后进行cum
 	gp.sort_values('qujian_bin',ascending=True,inplace=True)
@@ -230,7 +231,7 @@ def cal_lift(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,
 	out_cols=['qujian','qujian_bin','qujian_left','rate_bad','cnt_bad',
 	'cnt_of_total_cnt','bad_of_total_bad','cum_bad','cum_bad_of_total_bad',
 	'cnt','cum_cnt','cum_cnt_of_total_cnt','lift']
-
+	
 	return gp[out_cols] 
 
 
