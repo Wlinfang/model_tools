@@ -336,32 +336,9 @@ def cal_iv(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,de
 		return None 
 	return t['iv'].sum()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+def cal_corr():
+	'''
+	特征之家的相关性
+	线性相关 ： 皮尔逊系数计算
+	非线性相关 ：
+	'''
