@@ -231,8 +231,37 @@ def cal_lift(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,
 	out_cols=['qujian','qujian_bin','qujian_left','rate_bad','cnt_bad',
 	'cnt_of_total_cnt','bad_of_total_bad','cum_bad','cum_bad_of_total_bad',
 	'cnt','cum_cnt','cum_cnt_of_total_cnt','lift']
-	
+
 	return gp[out_cols] 
+
+
+
+def cal_pdp(df,feature_name,model_name,feature_grid=[],n_bin=10,is_same_width=False,default_value=None):
+	'''
+	主要计算特征同模型分之间的关系
+	对特征值进行分组,每组计算模型分的均值;模型分不能为空
+	feature_grid 优先指定分组区间；
+	'''
+
+	df=df[df[model_name].notna()]
+	# fst:数据分组
+	df=cal_bin(df=df,feature_name=feature_name,feature_grid=feature_grid,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
+	if df is None:
+		return None
+	# 按组分计算模型分的均值
+	gp=df.groupby(['qujian']).agg(cnt=(model_name,'count'),model_avg=(model_name,'mean')).reset_index()
+	
+	gp['qujian']=gp['qujian'].astype('category')
+	gp['qujian_bin']=gp['qujian'].cat.codes 
+	gp.loc[gp['qujian']=='缺失值','qujian_bin']=-1
+	gp['qujian_bin']=gp['qujian_bin'].astype(int)
+	gp['qujian_left']=gp['qujian'].apply(lambda x: '缺失值' if x== '缺失值' else float(x.left))
+	gp.sort_values('qujian_bin',ascending=True,inplace=True)
+
+	out_cols=['qujian','qujian_bin','qujian_left','cnt','model_avg']
+	return gp[out_cols]
+
+
 
 
 def get_stat(cls, df_data,feature_name,label_name,n_bin=10,qcut_method=1):
@@ -283,45 +312,6 @@ def get_iv(cls, df_label, df_feature):
 
 
 
-def cal_lift_by_classes(df,feature_name,label,hue='',n_bin=10,is_same_width=False,default_value=-1):
-	'''
-	每组分别分组，即区间范围不一样
-	'''
-	if df.shape[0] == 0:
-		print('df is empty')
-		return None 
-	# 计算分组的等频分区
-	if pd.isnull(hue) ==False:
-		res=[]
-		ids=df[hue].unique().tolist()
-		for i in ids:
-			tmp=df[df[hue]==i]
-			gp=cal_lift(tmp,feature_name,label,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
-			if gp is None :
-				continue 
-			gp['hue']=i
-			res.append(gp)
-		if len(res) == 0:
-			return None 
-		return pd.concat(res)
-	else:
-		return cal_lift(df,feature_name,label,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
-
-
-def cal_liftr_with_same_bin(df,feature_name,label,hue='',feature_grid=[],n_bin=10,is_same_width=False,default_value=-1):
-	'''
-	使用统一的bin数据；如果feature_grid 为空，默认使用全量数据计算feature_grid；否则使用feature_grid
-	feature_grid:list 分组的
-	'''
-	if df.shape[0] == 0:
-		return None 
-	if len(feature_grid)==0:
-		feature_grid = cal_feature_grid(df,feature_name,n_bin,is_same_width,default_value)
-		if f is None :
-			return None 
-	df['qujian']=pd.cut(df[feature_name], feature_grid, include_lowest=True,precision=4)
-	# 分为
-	if 
 
 
 
@@ -334,19 +324,5 @@ def cal_liftr_with_same_bin(df,feature_name,label,hue='',feature_grid=[],n_bin=1
 
 
 
-def cal_pdp(df,feature_name,model_name,n_bin=10,is_same_width=True):
-	'''
-	主要计算特征同模型分之间的关系图
-	'''
-	# fst:数据分组
-	gp=cal_bin(df,feature_name,n_bin=n_bin,is_same_width=is_same_width)
-	# 按组分计算模型分的均值
-	gp=gp.groupby(['qujian','qujian_right','qujian_bin']).agg(cnt=(model_name,'count'),model_avg=(model_name,'mean')).reset_index()
-	# 排序，然后进行cum
-	gp.sort_values('qujian_bin',ascending=True,inplace=True)
-	gp.fillna(-1,inplace=True)
-	gp['feature']=feature_name
-	gp['model']=model_name
 
-	out_cols=['feature','model','']
-	return gp 
+
