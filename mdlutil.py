@@ -263,32 +263,48 @@ def cal_pdp(df,feature_name,model_name,feature_grid=[],n_bin=10,is_same_width=Fa
 
 
 
-
-def get_stat(cls, df_data,feature_name,label_name,n_bin=10,qcut_method=1):
+def cal_woe(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,default_value=None):
 	'''
-	如果是离散值，则根据离散值进行划分
-	如果是连续值，则先进行bin 划分，然后进行计算
+	Weight of Evidence
+	对数据进行分组，
+	返回每组的woe,iv值，总的iv值为sum()
+	label:[0,1] 1表示bad
+	woe: ln( 分组中bad占所有bad的比例 / 分组中good占所有good的比例)
+	iv : (分组中bad占所有bad的比例-分组中good占所有good的比例) * woe
 	'''
-	df_data = pd.DataFrame({'val': df_feature, 'label': df_label})
+	# fst.数据分组
+	df=cal_bin(df=df,feature_name=feature_name,feature_grid=feature_grid,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
+	if df is None:
+		return None 
 
-	# statistics of total count, total ratio, bad count, bad rate
+	# 分组计算
+	gp=df.groupby('qujian').agg(cnt=(label,'count'),cnt_bad=(label,'sum'),rate_bad=(label,'mean')).reset_index()
+	gp['qujian']=gp['qujian'].astype('category')
+	gp['qujian_bin']=gp['qujian'].cat.codes 
+	gp.loc[gp['qujian']=='缺失值','qujian_bin']=-1
+	gp['qujian_bin']=gp['qujian_bin'].astype(int)
+	gp['qujian_left']=gp['qujian'].apply(lambda x: '缺失值' if x== '缺失值' else float(x.left))
+	gp.sort_values('qujian_bin',ascending=True,inplace=True)
 
-	df_stat = df_data.groupby('val').agg(total=('label', 'count'),
-										 bad=('label', 'sum'),
-										 bad_rate=('label', 'mean'))
-	df_stat['var'] = var
-	df_stat['good'] = df_stat['total'] - df_stat['bad']
-	df_stat['total_ratio'] = df_stat['total'] / df_stat['total'].sum()
-	df_stat['good_density'] = df_stat['good'] / df_stat['good'].sum()
-	df_stat['bad_density'] = df_stat['bad'] / df_stat['bad'].sum()
-
+	gp['cnt_good']=gp['cnt']-gp['cnt_bad']
+	gp['cnt_of_total_cnt']=np.round(gp['cnt']/df.shape[0],3)
+	gp['good_of_total_good']=np.round(gp['cnt_good']/gp['cnt_good'].sum(),3)
+	gp['bad_of_total_bad']=np.round(gp['cnt_bad']/gp['cnt_bad'].sum(),3)
 	eps = np.finfo(np.float32).eps
-	df_stat.loc[:, 'iv'] = (df_stat['bad_density'] - df_stat['good_density']) * \
-						   np.log((df_stat['bad_density'] + eps) / (df_stat['good_density'] + eps))
+	# woe
+	gp['woe']=np.log((gp['bad_of_total_bad'] + eps) / (gp['good_of_total_good'] + eps))
+	# iv 
+	gp['iv']=(gp['bad_of_total_bad'] - gp['good_of_total_good']) * gp['woe']
 
-	cols = ['var', 'total', 'total_ratio', 'bad', 'bad_rate', 'iv', 'val']
-	df_stat = df_stat.reset_index()[cols].set_index('var')
-	return df_stat
+	# 3 位小数
+	gp['woe']=np.round(gp['woe'],3)
+	gp['iv']=np.round(gp['iv'],3)
+
+	out_cols=['qujian','qujian_bin','qujian_left','cnt','cnt_bad','cnt_good','cnt_of_total_cnt','bad_of_total_bad','good_of_total_good','woe','iv']
+	return gp[out_cols]
+
+
+
 
 
 
