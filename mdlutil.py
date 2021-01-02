@@ -280,6 +280,7 @@ def cal_woe(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,d
 	2、如果相邻分箱的woe值相同，则合并为1个分箱
 	3、当一个分箱内只有bad 或者 good时，修正公式公式计算中，加入 eps 
 	4、如果训练集woe满足单调性；but 验证集或测试集上不满足，则分箱不合理
+	5、缺失值的woe 可不满足单调性，因为缺失值尤其逻辑含义
 	'''
 	# fst.数据分组
 	df=cal_bin(df=df,feature_name=feature_name,feature_grid=feature_grid,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
