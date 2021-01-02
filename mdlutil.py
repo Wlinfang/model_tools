@@ -11,6 +11,8 @@ from sklearn.base import TransformerMixin, BaseEstimator, ClassifierMixin
 import logging
 logger = logging.getLogger(__name__)
 
+
+
 def cal_week(df,date_name,date_name_new):
 	'''
 	:param df: dateframe
@@ -271,6 +273,13 @@ def cal_woe(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,d
 	label:[0,1] 1表示bad
 	woe: ln( 分组中bad占所有bad的比例 / 分组中good占所有good的比例)
 	iv : (分组中bad占所有bad的比例-分组中good占所有good的比例) * woe
+
+	woe:
+
+	1、每个分箱的woe值满足单调性，不满足，分箱不合理，需要调整分箱
+	2、如果相邻分箱的woe值相同，则合并为1个分箱
+	3、当一个分箱内只有bad 或者 good时，修正公式公式计算中，加入 eps 
+	4、如果训练集woe满足单调性；but 验证集或测试集上不满足，则分箱不合理
 	'''
 	# fst.数据分组
 	df=cal_bin(df=df,feature_name=feature_name,feature_grid=feature_grid,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
@@ -291,7 +300,7 @@ def cal_woe(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,d
 	gp['good_of_total_good']=np.round(gp['cnt_good']/gp['cnt_good'].sum(),3)
 	gp['bad_of_total_bad']=np.round(gp['cnt_bad']/gp['cnt_bad'].sum(),3)
 	eps = np.finfo(np.float32).eps
-	# woe
+	# woe，eps 是为了解决分箱中只有good 或者只有bad 时
 	gp['woe']=np.log((gp['bad_of_total_bad'] + eps) / (gp['good_of_total_good'] + eps))
 	# iv 
 	gp['iv']=(gp['bad_of_total_bad'] - gp['good_of_total_good']) * gp['woe']
@@ -304,14 +313,27 @@ def cal_woe(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,d
 	return gp[out_cols]
 
 
+def cal_iv(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,default_value=None):
+	'''
+	同 cal_woe 的方法的区别：
+	cal_woe 中的iv是针对每组的计算；
+	cal_iv 则返回一个float ，cal_woe()['iv'].sum()=各个组的iv求和
 
+	woe: 描述了预测和目标的关系，范围是实数范围
+	iv:衡量了这个关系的大小
 
+	iv 效果范围：
 
-
-def get_iv(cls, df_label, df_feature):
-	df_stat = cls.get_stat(df_label, df_feature)
-	return df_stat['iv'].sum()
-
+	[0,0.02) 几乎没有效果
+	[0.02,0.1) 弱
+	[0.1,0.3) 中等
+	[0.3,0.5) 强
+	[0.5,∞）效果难以置信，需要确认下
+	'''
+	t = cal_woe(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,default_value=None)
+	if t is None:
+		return None 
+	return t['iv'].sum()
 
 
 
