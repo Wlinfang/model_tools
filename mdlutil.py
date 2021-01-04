@@ -328,7 +328,7 @@ def cal_iv(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,de
 	t = cal_woe(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,default_value=None)
 	if t is None:
 		return None 
-	return t['iv'].sum()
+	return np.round(t['iv'].sum(),3)
 
 def cal_corr(df,feature_name_list):
 	'''
