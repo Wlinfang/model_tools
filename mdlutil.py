@@ -1,16 +1,9 @@
 import pandas as pd
 import numpy as np
-import warnings
-warnings.filterwarnings('ignore')
+# import warnings
+# warnings.filterwarnings('ignore')
 
-
-import statsmodels.api as sm
-from statsmodels.stats.outliers_influence import variance_inflation_factor
-from sklearn.base import TransformerMixin, BaseEstimator, ClassifierMixin
-
-import logging
-logger = logging.getLogger(__name__)
-
+import seaborn as sn 
 
 
 def cal_week(df,date_name,date_name_new):
@@ -227,12 +220,14 @@ def cal_lift(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,
 	# 计算 占比； bad 占所有的bad 比例 与 累计总样本
 	gp['cum_bad_of_total_bad']=np.round(gp['cum_bad']/cnt_bad,3)
 	gp['cum_cnt_of_total_cnt']=np.round(gp['cum_cnt']/df.shape[0],3)
+	
+	gp['lift']=np.round(gp['bad_of_total_bad']/gp['cnt_of_total_cnt'],3)
 	# lift ,如果 >1 则有识别；if < 1；则无识别
-	gp['lift']=np.round(gp['cum_bad_of_total_bad']/gp['cum_cnt_of_total_cnt'],3)
+	gp['cum_lift']=np.round(gp['cum_bad_of_total_bad']/gp['cum_cnt_of_total_cnt'],3)
 
 	out_cols=['qujian','qujian_bin','qujian_left','rate_bad','cnt_bad',
 	'cnt_of_total_cnt','bad_of_total_bad','cum_bad','cum_bad_of_total_bad',
-	'cnt','cum_cnt','cum_cnt_of_total_cnt','lift']
+	'cnt','cum_cnt','cum_cnt_of_total_cnt','lift','cum_lift']
 
 	return gp[out_cols] 
 
@@ -276,11 +271,10 @@ def cal_woe(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,d
 
 	woe:
 
-	1、每个分箱的woe值满足单调性，不满足，分箱不合理，需要调整分箱
+	1、缺失值的woe 可不满足单调性，因为缺失值尤其逻辑含义
 	2、如果相邻分箱的woe值相同，则合并为1个分箱
 	3、当一个分箱内只有bad 或者 good时，修正公式公式计算中，加入 eps 
-	4、如果训练集woe满足单调性；but 验证集或测试集上不满足，则分箱不合理
-	5、缺失值的woe 可不满足单调性，因为缺失值尤其逻辑含义
+	4、如果训练集woe满足单调性；but 验证集或测试集上不满足，则分箱不合理或者这个特征不稳定，时效性差
 	'''
 	# fst.数据分组
 	df=cal_bin(df=df,feature_name=feature_name,feature_grid=feature_grid,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
@@ -336,9 +330,18 @@ def cal_iv(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,de
 		return None 
 	return t['iv'].sum()
 
-def cal_corr():
+def cal_corr(df,feature_name_list):
 	'''
 	特征之家的相关性
 	线性相关 ： 皮尔逊系数计算
 	非线性相关 ：
 	'''
+	plt.figure(figsize=(12,6))
+	sn.heatmap(df[feature_name_list].corr(),annot=True,cmap="YlGnBu")
+	plt.title('person corr')
+	plt.show()
+
+	# 非线性相关计算
+
+
+
