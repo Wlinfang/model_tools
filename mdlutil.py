@@ -67,13 +67,15 @@ def cal_describe(df,feature_name_list):
 
 	gp=gp.join(df[feature_name_list].nunique(axis=0).to_frame().rename(columns={0:'nunique'}))
 	gp=gp.reset_index().rename(columns={'index':'feature_name'})
-	a=df[feature_name_list].mode(axis=0).T.reset_index()
+	a=df[feature_name_list].mode(axis=0)
 	if a.shape[0] >0 :
 		# a 中过滤有多个众数的特征
-		if a.shape[1] > 2:
-			d=a[a[1].notna()]['index'].values.tolist()
-			a = a[~a['index'].isin(d)]
-			a = a[['index',0]]
+		if a.shape[0] > 1:
+			d=a[1:2].dropna(axis=1,how='all').columns.tolist()
+			a=a[set(feature_name_list)-set(d)]
+			a=a.T.dropna(axis=1,how='any').reset_index()
+		else:
+			a=a.T.reset_index()
 		a.columns=['feature_name','mode']
 		gp=gp.merge(a,how='left')
 		# 众数占有值的比例
