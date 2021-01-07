@@ -239,6 +239,30 @@ def cal_lift(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,
 	return gp[out_cols] 
 
 
+def cal_y_by_classes(df,label,sub_classes=[],classes=[]):
+	'''
+	label : 取值[0，1]；  1：bad; 0: good
+	sub_classes:在 classes 的基础上进一步细分;比如 classes=['loan_month'],sub_classes=['loan_month','loan_amount'...]
+	如果 sub_classes 为空，则总体计算； 
+	'''
+	if len(sub_classes) > 0:
+		gp=df.groupby(sub_classes).agg(cnt=(label,'count'),cnt_bad=(label,'sum'),rate_bad=(label,'mean')).reset_index()
+		if len(classes) > 0 and len(set(sub_classes) & set(classes)) > 0:
+			share_classes=list(set(sub_classes) & set(classes))
+			gp=gp.merge(df.groupby(classes).agg(cnt_all=(label,'count'),cnt_bad_all=(label,'sum')).reset_index(),on=share_classes,how='left')
+		else:
+			gp['cnt_all']=df.shape[0]
+			gp['cnt_bad_all']=df[label].sum()
+
+		gp['rate_bad']=np.round(gp['rate_bad'],3)
+		gp['bad_of_total_bad']=np.round(gp['cnt_bad']/gp['cnt_bad_all'],3)
+		gp['cnt_of_total_cnt']=np.round(gp['cnt']/gp['cnt_all'],3)
+	else:
+		gp = pd.DataFrame([[df.shape[0],df[label].sum(),np.round(df[label].mean(),3)]],columns=['cnt','cnt_bad','rate_bad'])
+
+	return gp 
+
+
 
 def cal_pdp(df,feature_name,model_name,feature_grid=[],n_bin=10,is_same_width=False,default_value=None):
 	'''
