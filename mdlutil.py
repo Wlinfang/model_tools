@@ -253,6 +253,7 @@ def cal_y_by_classes(df,label,sub_classes=[],classes=[]):
 			gp=gp.merge(df.groupby(classes).agg(cnt_all=(label,'count'),cnt_bad_all=(label,'sum')).reset_index(),on=share_classes,how='left')
 			gp['bad_of_total_bad']=np.round(gp['cnt_bad']/gp['cnt_bad_all'],3)
 			gp['cnt_of_total_cnt']=np.round(gp['cnt']/gp['cnt_all'],3)
+			gp['lift']=np.round(gp['bad_of_total_bad']/gp['cnt_of_total_cnt'],3)
 
 		gp['rate_bad']=np.round(gp['rate_bad'],3)
 	else:
