@@ -88,7 +88,6 @@ def cal_describe(df,feature_name_list):
 	return gp
 
 
-
 def cal_feature_grid(df,feature_name,n_bin=10,is_same_width=True,default_value=None):
 	'''
 	计算分组，剔除空值或默认值后剩余的数据进行分组；空值和默认值为单独一个组
@@ -232,9 +231,9 @@ def cal_lift(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,
 	# lift ,如果 >1 则有识别；if < 1；则无识别
 	gp['cum_lift']=np.round(gp['cum_bad_of_total_bad']/gp['cum_cnt_of_total_cnt'],3)
 
-	out_cols=['qujian','qujian_bin','qujian_left','rate_bad','cnt_bad',
-	'cnt_of_total_cnt','bad_of_total_bad','cum_bad','cum_bad_of_total_bad',
-	'cnt','cum_cnt','cum_cnt_of_total_cnt','lift','cum_lift']
+	out_cols=['qujian','qujian_bin','qujian_left','cnt','cnt_bad','rate_bad',
+	'cnt_of_total_cnt','bad_of_total_bad','lift','cum_cnt','cum_bad','cum_cnt_of_total_cnt',
+	'cum_bad_of_total_bad','cum_lift']
 
 	return gp[out_cols] 
 
