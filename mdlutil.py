@@ -5,7 +5,18 @@ import datetime
 # warnings.filterwarnings('ignore')
 
 import seaborn as sn 
-
+import matplotlib.pyplot as plt
+import matplotlib.style as psl 
+# 样式复制 ggplot
+psl.use('ggplot') 
+# import matplotlib
+# 刻度方向配置
+plt.rcParams['xtick.direction'] = 'out' 
+plt.rcParams['ytick.direction'] = 'inout' 
+# 字体配置--支持中文
+plt.rcParams['font.sans-serif']=['SimHei']
+# 显示负号
+plt.rcParams['axes.unicode_minus']=False
 
 def cal_week(df,date_name,date_name_new):
 	'''
@@ -373,3 +384,25 @@ def cal_corr(df,feature_name_list):
 
 
 
+def plot_hist_and_line(df,x,y_hist,y_line,title='',is_show=True):
+	'''
+	双y轴数据
+	y_hist: hist ：柱形图数据
+	y_line: line : 线性图数据
+	'''
+	fig=plt.figure(figsize=(10,6))
+	ax1 = fig.add_subplot(111)  
+	ax1.plot(df[x], df[y_line],'or-',label=y_line)
+	ax1.legend(loc='upper left',labels=[y_line])
+	plt.setp(ax1.get_xticklabels(), rotation=45, horizontalalignment='right')
+
+	ax2 = ax1.twinx() # this is the important function  
+	ax2.bar(df[x],df[y_hist],alpha=0.3,color='blue',label=y_hist)
+	ax2.legend(loc='upper right',labels=[y_hist])
+	# plt.title(title)
+	plt.title(title,backgroundcolor='#3c7f99',fontsize=24, weight='bold',color='white')
+	plt.xticks(rotation=45,fontsize=12,weight='bold')
+
+	if is_show:
+		plt.show()
+	return plt  
