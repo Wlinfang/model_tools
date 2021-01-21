@@ -7,16 +7,29 @@ import datetime
 import seaborn as sn 
 import matplotlib.pyplot as plt
 import matplotlib.style as psl 
+from mpl_toolkits.axes_grid1 import host_subplot
 # 样式复制 ggplot
 psl.use('ggplot') 
-# import matplotlib
 # 刻度方向配置
 plt.rcParams['xtick.direction'] = 'out' 
 plt.rcParams['ytick.direction'] = 'inout' 
 # 字体配置--支持中文
-plt.rcParams['font.sans-serif']=['SimHei']
+plt.rcParams['font.sans-serif']=['SimHei','YouYuan']
 # 显示负号
-plt.rcParams['axes.unicode_minus']=False
+plt.rcParams['axes.unicode_minus']=False # 负数
+
+plt.rcParams['figure.figsize'] = (8.0, 4.0) # 设置figure_size尺寸
+plt.rcParams['savefig.dpi'] = 300 # 保存的图片像素
+plt.rcParams['figure.dpi'] = 300 #分辨率
+plt.rcParams['image.interpolation'] = 'nearest' # 设置 interpolation style
+plt.rcParams['image.cmap'] = 'gray' # 设置 颜色 style
+
+
+pd.set_option('display.float_format', lambda x: '%.3f' % x)
+pd.set_option('display.precision',3)
+pd.set_option('display.max_rows',2000)
+pd.set_option('display.max_columns',2000)
+
 
 def cal_week(df,date_name,date_name_new):
 	'''
@@ -384,6 +397,8 @@ def cal_corr(df,feature_name_list):
 
 
 
+
+
 def plot_hist_and_line(df,x,y_hist,y_line,title='',is_show=True):
 	'''
 	双y轴数据
@@ -406,3 +421,36 @@ def plot_hist_and_line(df,x,y_hist,y_line,title='',is_show=True):
 	if is_show:
 		plt.show()
 	return plt  
+
+def plot_line_with_doubley(df,x,y1,y2,x_label=None,y1_label=None,y2_label=None,title=''):
+	'''
+	同1个x轴，2个y轴，均为线
+	'''
+    if not x_label:
+        x_label=x
+    if not y1_label:
+        y1_label=y1
+    if not y2_label:
+        y2_label=y2
+    fig = plt.figure(figsize=[12,6])
+    ax1 = host_subplot(111)
+    ax2 = ax1.twinx()
+    
+    ax1.set_xlabel(x)
+    ax1.set_ylabel(y1_label)
+    ax2.set_ylabel(y2_label)
+    
+    p1, = ax1.plot(df[x], df[y1], label=y1_label)
+    p2, = ax2.plot(df[x], df[y2], label=y2_label)
+    
+    leg = plt.legend(loc='best')
+    ax1.yaxis.get_label().set_color(p1.get_color())
+    leg.texts[0].set_color(p1.get_color())
+
+    ax2.yaxis.get_label().set_color(p2.get_color())
+    leg.texts[1].set_color(p2.get_color())
+    
+    plt.title(title)
+
+    plt.show()
+    return fig
