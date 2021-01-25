@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import datetime
+from scipy import stats 
 # import warnings
 # warnings.filterwarnings('ignore')
 
@@ -29,6 +30,38 @@ pd.set_option('display.float_format', lambda x: '%.3f' % x)
 pd.set_option('display.precision',3)
 pd.set_option('display.max_rows',2000)
 pd.set_option('display.max_columns',2000)
+
+
+def cal_norm_confidence(df,feature_name,confidence=0.95,is_biased_estimate=False):
+	'''
+	计算正太分布的置信区间
+	confidence:置信度
+	is_biased_estimate：计算标准差是有偏还是无偏；True:有偏；利用样本估计总体标准差
+	'''
+	sample_mean = df[feature_name].mean()
+	if is_biased_estimate == True:
+		# 有偏估计
+		sample_std = df[feature_name].std(ddof=0)
+	else:
+		# 无偏 
+		sample_std = df[feature_name].std(ddof=1)
+	return stats.norm.interval(confidence, loc=sample_mean, scale=sample_std)
+
+def cal_t_confidence(df,feature_name,confidence=0.95,is_biased_estimate=False):
+	'''
+	计算t分布的置信区间
+	'''
+	sample_mean = df[feature_name].mean()
+	if is_biased_estimate == True:
+		# 有偏估计
+		sample_std = df[feature_name].std(ddof=0)
+	else:
+		# 无偏 
+		sample_std = df[feature_name].std(ddof=1)
+
+	return stats.t.interval(confidence, df=(df.shape[0]-1),loc=sample_mean, scale=sample_std)
+
+
 
 
 def cal_week(df,date_name,date_name_new):
