@@ -31,35 +31,45 @@ pd.set_option('display.precision',3)
 pd.set_option('display.max_rows',2000)
 pd.set_option('display.max_columns',2000)
 
-
-def cal_norm_confidence(df,feature_name,confidence=0.95,is_biased_estimate=False):
-	'''
-	计算正太分布的置信区间
-	confidence:置信度
+class  Confidence:
+	"""
+	假设估计置信度区间计算
+	confidence：置信度
 	is_biased_estimate：计算标准差是有偏还是无偏；True:有偏；利用样本估计总体标准差
-	'''
-	sample_mean = df[feature_name].mean()
-	if is_biased_estimate == True:
-		# 有偏估计
-		sample_std = df[feature_name].std(ddof=0)
-	else:
-		# 无偏 
-		sample_std = df[feature_name].std(ddof=1)
-	return stats.norm.interval(confidence, loc=sample_mean, scale=sample_std)
+	"""
+	def __init__(self, confidence=0.95,is_biased_estimate=False):
+		super( Confidence, self).__init__()
+		self.confidence = confidence
+		self.is_biased_estimate=is_biased_estimate
+		
+	def cal_norm_confidence(df,feature_name):
+		'''
+		计算正太分布的置信区间
+		confidence:置信度
+		is_biased_estimate：计算标准差是有偏还是无偏；True:有偏；利用样本估计总体标准差
+		'''
+		sample_mean = df[feature_name].mean()
+		if self.is_biased_estimate == True:
+			# 有偏估计
+			sample_std = df[feature_name].std(ddof=0)
+		else:
+			# 无偏 
+			sample_std = df[feature_name].std(ddof=1)
+		return stats.norm.interval(self.confidence, loc=sample_mean, scale=sample_std)
 
-def cal_t_confidence(df,feature_name,confidence=0.95,is_biased_estimate=False):
-	'''
-	计算t分布的置信区间
-	'''
-	sample_mean = df[feature_name].mean()
-	if is_biased_estimate == True:
-		# 有偏估计
-		sample_std = df[feature_name].std(ddof=0)
-	else:
-		# 无偏 
-		sample_std = df[feature_name].std(ddof=1)
+	def cal_t_confidence(df,feature_name):
+		'''
+		计算t分布的置信区间
+		'''
+		sample_mean = df[feature_name].mean()
+		if self.is_biased_estimate == True:
+			# 有偏估计
+			sample_std = df[feature_name].std(ddof=0)
+		else:
+			# 无偏 
+			sample_std = df[feature_name].std(ddof=1)
 
-	return stats.t.interval(confidence, df=(df.shape[0]-1),loc=sample_mean, scale=sample_std)
+		return stats.t.interval(self.confidence, df=(df.shape[0]-1),loc=sample_mean, scale=sample_std)
 
 
 
@@ -110,6 +120,13 @@ def cal_describe(df,feature_name_list):
 	'''
 	计算特征描述性分析 包括cnt,缺失率，方差，分位数，众数，众数占比
 	众数限制为1个的情况，如果多个众数，则不进行计算
+	偏度：当偏度<0时，概率分布图左偏。
+		 当偏度=0时，表示数据相对均匀的分布在平均值两侧，不一定是绝对的对称分布。
+		 当偏度>0时，概率分布图右偏
+		 计算公式=1/n Σ((X-μ)/σ)^3  同方差的区别是 2次方变为3次方，其实核心是求矩的
+	峰度:对比正太，正太的峰度=3，计算的时候-3，正太峰度=0
+		 峰度值>0，则表示该数据分布与正态分布相比较为高尖，
+		 当峰度值<0，则表示该数据分布与正态分布相比较为矮胖。
 	return df:
 	'''
 	# 提取数字型数据
@@ -142,6 +159,13 @@ def cal_describe(df,feature_name_list):
 		gp['mode']=None
 		gp['mode_count']=None
 		gp['mode_rate']=None
+	# 计算偏度，<0 左偏 =0 正太分布；>0 右偏
+	a=df[feature_name_list].skew(axis=0,skipna=True).reset_index().rename(columns={'index':'feature_name',0:'skew'})
+	gp=gp.merge(a,on='feature_name',how='left')
+
+	#计算峰度
+	a=df[feature_name_list].kurt(axis=0,skipna=True).reset_index().rename(columns={'index':'feature_name',0:'kurt'})
+	gp=gp.merge(a,on='feature_name',how='left')
 	return gp
 
 
@@ -438,7 +462,7 @@ def plot_hist_and_line(df,x,y_hist,y_line,title='',is_show=True):
 	y_hist: hist ：柱形图数据
 	y_line: line : 线性图数据
 	'''
-	fig=plt.figure(figsize=(10,6))
+	fig=plt.figure(figsize=(12,6))
 	ax1 = fig.add_subplot(111)  
 	ax1.plot(df[x], df[y_line],'or-',label=y_line)
 	ax1.legend(loc='upper left',labels=[y_line])

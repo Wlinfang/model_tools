@@ -2,7 +2,7 @@
 分类算法
 '''
 
-from sklearn.metrics import accuracy_score,precision_score
+from sklearn.metrics import accuracy_score,precision_score,roc_curve
 from sklearn.metrics import classification_report, confusion_matrix,roc_auc_score
 
 def cal_evaluate_classier(y_real,y_pred):
