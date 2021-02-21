@@ -296,8 +296,15 @@ def cal_lift(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,
 	gp.rename(columns={'cnt':'样本数','cnt_bad':'坏样本数','rate_bad':'坏样本率'},inplace=True)
 	gp=gp[['bucket','qujian','样本数','坏样本数','坏样本率']]
 	gp['坏样本比例']=np.round(gp['坏样本数']/cnt_bad_all,4)
+	gp['好样本比例']=np.round((gp['样本数']-gp['坏样本数'])/cnt_good_all,4)
 	gp['样本比例']=np.round(gp['样本数']/df.shape[0],4)
 	gp['lift']=np.round(gp['坏样本比例']/gp['样本比例'],2)
+
+	eps = np.finfo(np.float32).eps
+	# woe，eps 是为了解决分箱中只有good 或者只有bad 时
+	gp['woe']=np.round(np.log((gp['坏样本比例'] + eps) / (gp['好样本比例'] + eps)),3)
+	# iv 
+	gp['iv']=np.round((gp['坏样本比例'] - gp['好样本比例']) * gp['woe'],3)
 	
 	# 累计
 	gp.sort_values('bucket',ascending=True,inplace=True)
@@ -366,14 +373,15 @@ def cal_pdp(df,feature_name,model_name,feature_grid=[],n_bin=10,is_same_width=Fa
 	gp=df.groupby(['qujian']).agg(cnt=(model_name,'count'),model_avg=(model_name,'mean')).reset_index()
 	
 	gp['qujian']=gp['qujian'].astype('category')
-	gp['qujian_bin']=gp['qujian'].cat.codes 
-	gp.loc[gp['qujian']=='缺失值','qujian_bin']=-1
-	gp['qujian_bin']=gp['qujian_bin'].astype(int)
-	gp['qujian_left']=gp['qujian'].apply(lambda x: '缺失值' if x== '缺失值' else float(x.left))
-	gp.sort_values('qujian_bin',ascending=True,inplace=True)
-
-	out_cols=['qujian','qujian_bin','qujian_left','cnt','model_avg']
+	gp['bucket']=gp['qujian'].cat.codes 
+	gp.loc[gp['qujian']=='miss data','bucket']=-1
+	gp['bucket']=gp['bucket'].astype(int)+1
+	
+	gp.sort_values('bucket',ascending=True,inplace=True)
+	gp.rename(columns={'cnt':'样本数','model_avg':'模型分均值'},inplace=True)
+	out_cols=['bucket','qujian','样本数','模型分均值']
 	return gp[out_cols]
+
 
 
 
@@ -401,11 +409,10 @@ def cal_woe(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,d
 	# 分组计算
 	gp=df.groupby('qujian').agg(cnt=(label,'count'),cnt_bad=(label,'sum'),rate_bad=(label,'mean')).reset_index()
 	gp['qujian']=gp['qujian'].astype('category')
-	gp['qujian_bin']=gp['qujian'].cat.codes 
-	gp.loc[gp['qujian']=='缺失值','qujian_bin']=-1
-	gp['qujian_bin']=gp['qujian_bin'].astype(int)
-	gp['qujian_left']=gp['qujian'].apply(lambda x: '缺失值' if x== '缺失值' else float(x.left))
-	gp.sort_values('qujian_bin',ascending=True,inplace=True)
+	gp['bucket']=gp['qujian'].cat.codes 
+	gp.loc[gp['qujian']=='miss data','bucket']=-1
+	gp['bucket']=gp['bucket'].astype(int) +1 
+	gp.sort_values('bucket',ascending=True,inplace=True)
 
 	gp['cnt_good']=gp['cnt']-gp['cnt_bad']
 	gp['cnt_of_total_cnt']=np.round(gp['cnt']/df.shape[0],3)
@@ -421,7 +428,11 @@ def cal_woe(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,d
 	gp['woe']=np.round(gp['woe'],3)
 	gp['iv']=np.round(gp['iv'],3)
 
-	out_cols=['qujian','qujian_bin','qujian_left','cnt','cnt_bad','cnt_good','cnt_of_total_cnt','bad_of_total_bad','good_of_total_good','woe','iv']
+	gp.rename(columns={'cnt':'样本数','cnt_bad':'坏样本数','cnt_good':'好样本数','cnt_of_total_cnt':'样本比例',
+		'bad_of_total_bad':'坏样本比例','good_of_total_good':'好样本比例'},inplace=True)
+
+	out_cols=['bucket','qujian','样本数','坏样本数','好样本数','样本比例','坏样本比例','好样本比例','woe','iv']
+
 	return gp[out_cols]
 
 
@@ -519,3 +530,144 @@ def plot_line_with_doubley(df,x,y1,y2,x_label=None,y1_label=None,y2_label=None,t
 
     plt.show()
     return fig
+
+
+def cal_evaluate_classier(df,y_real,y_pred,label=''):
+	
+	'''
+	label:表示 roc 图的 label 
+
+	二分类模型评估指标
+	@param y_real : list，真实值
+	@param y_pred : list, 预测值
+	混淆矩阵：
+			真实值
+			1	0
+	预测值 1 TP  FP
+		  0 FN  TN
+	准确率 Accuracy = (TP+TN) / (TP+FP+FN+TN)
+	精确率(Precision) = TP / (TP+FP) --- 预测为正样本 分母为预测正样本
+	召回率(Recall) = TP / (TP+FN) -- 实际为正样本 分母为真实正样本
+	F-Meauter = (a^2 + 1) * 精确率 * 召回率 / [a^2 * (精确率 + 召回率)]
+	a^2 如何定义
+	F1分数(F1-Score) = 2 *  精确率 * 召回率 / (精确率 + 召回率)
+	P-R曲线 ： 平衡点即为 F1分数；y-axis = 精确率；x-axis= 召回率
+	平衡点 ： 精确率 = 召回率
+	真正率(TPR) = TP / (TP+FN)-- 以真实样本 分母为真实正样本
+	假正率(FPR) = FP / (FP+TN)-- 以真实样本 分母为真实负样本
+	Roc 曲线：y-axis=真正率 ; x-axis=假正率； 无视样本不均衡问题
+	AUC = Roc 曲线面积
+	'''
+	# accuracy = metrics.accuracy_score(y_real, y_pred)
+	# p=precision_score(y_real, y_pred)
+	# f1=f1_score(y_real, y_pred)
+	# 返回confusion matrix
+	cnt=df.shape[0]
+	cnt_bad=df[y_real].sum()
+	rate_bad=np.round(df[y_real].mean(),3)
+
+	# 这个y_real y_pred 取值范围一致
+	# cm = confusion_matrix(y_real,y_pred)
+	# # 返回 精确率，召回率，F1；y_real 和 y_pred 取值范围一致
+	# cr = classification_report(y_real,y_pred)
+	auc = roc_auc_score(df[y_real],df[y_pred]) 
+
+	fpr, tpr, thr = roc_curve(df[y_real],df[y_pred])
+	ks = max(abs(tpr - fpr))
+	# roc 图
+	plt.plot(fpr,tpr,label=label)
+	plt.title('roc_curve')
+	plt.xlabel('fpr')
+	plt.ylabel('tpr')
+	plt.legend(loc='upper right')
+
+	return pd.DataFrame([[cnt,cnt_bad,rate_bad,auc,ks]],columns=['样本数','坏样本数','坏样本率','auc','ks'])
+
+
+def cal_vintage(df,passdue_day=30,mob_method=):
+
+	'''
+	df ： loan_id loan_amount loan_time loan_term
+	      plan_id term_no due_time repay_time plan_prin_amt【应还本金】 act_prin_amt【实还本金】 repay_status
+	      repay_time：如果未还款，则为null
+	mob_method: mob 的计算方法，2种方式，1种是月末节点；1种是期末时点
+	MOB0：放款日到当月月底
+	MOB1:放款后的第二个完整的自然月
+	MOB2:放款后的第三个完整的自然月
+	MOB 同 loan_term 有关
+	不同时间点的借据，表现期的长度不一样，比如：
+	假设放款日在6月3号，第一个还款日为7-3号，mob1_date=7-31,逾期表现有28天
+	假设放款日在6-27号，第一个还款日为7-27号，mob1_date=7-31，逾期表现有4天
+	解决表现不一样问题，可以使用期末时点
+
+	MOB0：放款日到term_no=1的due_time时间
+
+	MOB1:term_no=1的due_time 到 term_no=2的due_time
+	观察日：mob_date ；同每一期交叉
+	比如：7-31号  term_no=1;term_no=2;term_no=3
+		 8-31号  term_no=1;term_no=2;term_no=3
+
+	曾经逾期：截止到观察点，只要用户曾经发生过逾期,不管观察点是否结清，都认为这笔借据逾期；
+			 保证了vintage 曲线单调不减;站在观察日的角度计算逾期天数
+	当前逾期：用户在观察点上当前是否处于逾期状态；如果结清，则认为正常；
+	         vintage 曲线可能先上后降;站在观察日的角度计算逾期天数
+
+	'''
+
+	# df 中计算 观察日 mod_date 
+
+	# 计算逾期天数
+	df.mod_date=pd.to_datetime(df.mod_date)
+	df.due_time=pd.to_datetime(df.due_time)
+	df.repay_time=pd.to_datetime(df.repay_time)
+
+	df['ever口径逾期天数']=np.nan 
+	# 站在观察日的角度看，未到还款日
+	df.loc[df.mod_date <= df.due_time,'ever口径逾期天数']=0
+
+	  
+	# 站在观察日的角度看，已到还款日,但是仍然未还款的情况
+	con=(df.mod_date > df.due_time) & (df.repay_time.isna())
+	df.loc[con,'ever口径逾期天数'] = (df[con].mod_date-df[con].due_time).dt.days
+	# 站在观察日的角度看，已还款但是还款日>观察日
+	con=(df.repay_time.notna()) & (df.repay_time > df.mod_date) & (df.mod_date > df.due_time)
+	df.loc[con,'ever口径逾期天数']=(df[con].mod_date-df[con].due_time).dt.days
+	# 站在观察日的角度看，已还款但是还款日<观察日 
+	con=(df.repay_time.notna()) & (df.repay_time <= df.mod_date) & (df.repay_time < datetime.datetime.now().date())
+	df.loc[con,'ever口径逾期天数']=(df[con].repay_time-df[con].due_time).dt.days
+	# 站在观察日的角度看，应还日  当前日 还款日 观察日
+	con=(df.repay_time.notna()) & (df.repay_time <= df.mod_date) & (df.repay_time > datetime.datetime.now().date())
+	df.loc[con,'ever口径逾期天数']=(datetime.datetime.now().date()-df[con].due_time).dt.days
+
+	# 计算current 口径
+	df['当前逾期口径逾期天数']=df['ever口径逾期天数']
+	# 站在观察日的角度看，已还款但是还款日<观察日
+	con=(df.repay_time.notna()) & (df.repay_time <= df.mod_date)
+	df.loc[con,'当前逾期口径逾期天数']=0
+
+	# 账龄=mod_date - loan_time 的月份
+	df['mob']=(df.mod_date-df.loan_time).dt.month
+
+	# 剩余未还本金，假设M1，每一期判断是否M1，计算凡是有M1的贷款的当前的剩余未还本金
+	# loan_id 为维度，计算剩余未还本金，贷款本金-还款日还了的本金
+	t=df[df['ever口径逾期天数']>passdue_day].drop_duplicates(['loan_id','mob'])
+	t['ever口径逾期']=1
+	gp=df[['loan_id','mob','loan_amount','mob_date','loan_term','loan_time']].drop_duplicates(['loan_id','mob'])
+	gp=gp.merge(t[['loan_id','mob','ever口径逾期']],on=['loan_id','mob'],how='left')
+	gp=gp['ever口径逾期'].fillna(0)
+	# mob 账龄下，loan_id 逾期的标记
+	df=df.merge(t[['loan_id','mob','ever口径逾期']],on=['loan_id','mob'],how='left')
+	t=df[(df['ever口径逾期']==1) & (df.repay_time < df.mod_date)].groupby(['loan_id','mob'])['act_prin_amt'].sum().reset_index().rename(columns={'act_prin_amt':'逾期已还本金'})
+	gp=gp.merge(t,on=['loan_id','mob'],how='left')
+	gp['逾期未还本金']=gp['loan_amount']-gp['逾期已还本金']
+
+	# vintage 计算-- 统计为放款月份
+	# 分母：放款本金；分子：逾期未还本金
+
+
+
+
+
+	
+
+
