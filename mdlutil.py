@@ -218,17 +218,14 @@ def cal_bin(df,feature_name,feature_grid=[],n_bin=10,is_same_width=False,default
 	del df 
 	t1['qujian']=pd.cut(t1[feature_name], feature_grid, include_lowest=True,precision=4)
 	t1['qujian']=t1['qujian'].astype('category')
-	t1['qujian_bin']=t1['qujian'].cat.codes
-	t1['qujian_bin']=t1['qujian_bin'].astype(int)
-	t1['qujian_left']=t1['qujian'].apply(lambda x:x.left)
-	t1['qujian_left']=t1['qujian_left'].astype(float)
+	t1['bucket']=t1['qujian'].cat.codes
+	t1['bucket']=t1['bucket'].astype(int)+1
 
 	# 如果 df['qujian'] 为空，则为缺失值
 	if t2.shape[0] > 0:
 		print('miss data ')
-		t2['qujian']='缺失值'
-		t2['qujian_bin']=-1
-		t2['qujian_left']=None 
+		t2['qujian']='miss data'
+		t2['bucket']=-1
 		return pd.concat([t1,t2])
 	return t1 
 
@@ -272,51 +269,62 @@ def cal_psi(df_base,df_curr,feature_name,n_bin=10,is_same_width=False,default_va
 
 
 def cal_lift(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,default_value=None):
-	# feature_name: 模型分或特征名称
-	# feature_grid: 模型分组； 如果不为空，则按照feature_grid分bin；否则按照原规则进行
-	# label: 标签值；默认1为坏用户；0为好用户
-	# is_same_width：分组方式；True：等宽；False：等频
-	# default_value 默认值和缺失值统一为缺失值
+	'''
+	feature_name: 模型分或特征名称
+	feature_grid: 模型分组； 如果不为空，则按照feature_grid分bin；否则按照原规则进行
+	label: 标签值；默认1为坏用户；0为好用户
+	is_same_width：分组方式；True：等宽；False：等频
+	default_value 默认值和缺失值统一为缺失值
 
-
-	# fst:数据分组,包括空数据和非空数据
+	ks =累计坏样本比例-累计好样本比例最大值，可以表示为 误杀了累计好样本比例的用户的情况下，可以识别出多少的坏样本
+	坏样本比例=坏样本个数/坏样本总数
+	坏样本率=坏样本数/样本数
+	累计坏样本率=累计坏样本数/累计样本数
+	'''
 	df=cal_bin(df=df,feature_name=feature_name,feature_grid=feature_grid,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
-
-	# 所有的bad的用户
-	cnt_bad=df[label].sum()
-	if cnt_bad==0:
-		print("no bad user ")
-		return None 
-
 	# 包括了缺失值
 	gp=df.groupby(['qujian']).agg(cnt_bad=(label,'sum'),cnt=(label,'count'),rate_bad=(label,'mean')).reset_index()
 	
 	gp['qujian']=gp['qujian'].astype('category')
-	gp['qujian_bin']=gp['qujian'].cat.codes 
-	gp.loc[gp['qujian']=='缺失值','qujian_bin']=-1
-	gp['qujian_bin']=gp['qujian_bin'].astype(int)
-	gp['qujian_left']=gp['qujian'].apply(lambda x: '缺失值' if x== '缺失值' else float(x.left))
+	gp['bucket']=gp['qujian'].cat.codes 
+	gp.loc[gp['qujian']=='miss data','bucket']=-1
+	gp['bucket']=gp['bucket'].astype(int)+1
+
+	cnt_bad_all=df[label].sum()
+	cnt_good_all=df.shape[0]-cnt_bad_all
+
+	gp.rename(columns={'cnt':'样本数','cnt_bad':'坏样本数','rate_bad':'坏样本率'},inplace=True)
+	gp=gp[['bucket','qujian','样本数','坏样本数','坏样本率']]
+	gp['坏样本比例']=np.round(gp['坏样本数']/cnt_bad_all,4)
+	gp['样本比例']=np.round(gp['样本数']/df.shape[0],4)
+	gp['lift']=np.round(gp['坏样本比例']/gp['样本比例'],2)
 	
+	# 累计
+	gp.sort_values('bucket',ascending=True,inplace=True)
+	gp['累计坏样本数']=gp['坏样本数'].cumsum()
+	gp['累计样本数']=gp['样本数'].cumsum()
+	gp['累计样本比例']=np.round(gp['累计样本数']/df.shape[0],2)
+	gp['累计坏样本比例']=np.round(gp['累计坏样本数']/cnt_bad_all,4)
+	gp['累计lift']=np.round(gp['累计坏样本比例']/gp['累计样本比例'],2)
 
-	# 排序，然后进行cum
-	gp.sort_values('qujian_bin',ascending=True,inplace=True)
-	gp['bad_of_total_bad']=np.round(gp['cnt_bad']/cnt_bad,3)
-	gp['cnt_of_total_cnt']=np.round(gp['cnt']/df.shape[0],3)
-	gp['cum_bad']=gp['cnt_bad'].cumsum()
-	gp['cum_cnt']=gp['cnt'].cumsum()
-	# 计算 占比； bad 占所有的bad 比例 与 累计总样本
-	gp['cum_bad_of_total_bad']=np.round(gp['cum_bad']/cnt_bad,3)
-	gp['cum_cnt_of_total_cnt']=np.round(gp['cum_cnt']/df.shape[0],3)
+	# 这个根据分的递增或下降，可理解为拒绝或通过件的坏样本率
+	# 判断递增或递减方向
+	if gp[gp.bucket==2]['坏样本率'].values[0] > gp[gp.bucket==n_bin-1]['坏样本率'].values[0]:
+		# 递减趋势,分越小坏样本比例越高；拒绝分小的
+		gp['通过率']=1-gp['累计样本比例']
+		gp['拒绝件坏样本率']=np.round(gp['累计坏样本数']/gp['累计样本数'],4)
+		gp['通过件坏样本率']=np.round((cnt_bad_all-gp['累计坏样本数'])/(df.shape[0]-gp['累计样本数']),4)
+	else:
+		# 递增趋势，分越大坏样本比例越高；拒绝分大的
+		gp['通过率']=gp['累计样本比例']
+		gp['拒绝件坏样本率']=np.round((cnt_bad_all-gp['累计坏样本数'])/(df.shape[0]-gp['累计样本数']),4)
+		gp['通过件坏样本率']=np.round(gp['累计坏样本数']/gp['累计样本数'],4)
+
 	
-	gp['lift']=np.round(gp['bad_of_total_bad']/gp['cnt_of_total_cnt'],3)
-	# lift ,如果 >1 则有识别；if < 1；则无识别
-	gp['cum_lift']=np.round(gp['cum_bad_of_total_bad']/gp['cum_cnt_of_total_cnt'],3)
-
-	out_cols=['qujian','qujian_bin','qujian_left','cnt','cnt_bad','rate_bad',
-	'cnt_of_total_cnt','bad_of_total_bad','lift','cum_cnt','cum_bad','cum_cnt_of_total_cnt',
-	'cum_bad_of_total_bad','cum_lift']
-
-	return gp[out_cols] 
+	# 可以表示，误杀
+	gp['累计好样本比例']=np.round((gp['累计样本数']-gp['累计坏样本数'])/cnt_good_all,4)
+	gp['KS']=gp['累计坏样本比例']-gp['累计好样本比例']
+	return gp 
 
 
 def cal_y_by_classes(df,label,sub_classes=[],classes=[]):
