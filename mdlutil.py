@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import datetime
+import dateutil
 from scipy import stats 
 # import warnings
 # warnings.filterwarnings('ignore')
@@ -316,7 +317,7 @@ def cal_lift(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,
 
 	# 这个根据分的递增或下降，可理解为拒绝或通过件的坏样本率
 	# 判断递增或递减方向
-	if gp[gp.bucket==2]['坏样本率'].values[0] > gp[gp.bucket==n_bin-1]['坏样本率'].values[0]:
+	if gp[gp.bucket.min()==2]['坏样本率'].values[0] > gp[gp.bucket==gp.bucket.max()]['坏样本率'].values[0]:
 		# 递减趋势,分越小坏样本比例越高；拒绝分小的
 		gp['通过率']=1-gp['累计样本比例']
 		gp['拒绝件坏样本率']=np.round(gp['累计坏样本数']/gp['累计样本数'],4)
@@ -453,7 +454,7 @@ def cal_iv(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,de
 	[0.3,0.5) 强
 	[0.5,∞）效果难以置信，需要确认下
 	'''
-	t = cal_woe(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,default_value=None)
+	t = cal_woe(df,feature_name,label,feature_grid=feature_grid,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
 	if t is None:
 		return None 
 	return np.round(t['iv'].sum(),3)
@@ -502,34 +503,34 @@ def plot_line_with_doubley(df,x,y1,y2,x_label=None,y1_label=None,y2_label=None,t
 	'''
 	同1个x轴，2个y轴，均为线
 	'''
-    if not x_label:
-        x_label=x
-    if not y1_label:
-        y1_label=y1
-    if not y2_label:
-        y2_label=y2
-    fig = plt.figure(figsize=[12,6])
-    ax1 = host_subplot(111)
-    ax2 = ax1.twinx()
-    
-    ax1.set_xlabel(x)
-    ax1.set_ylabel(y1_label)
-    ax2.set_ylabel(y2_label)
-    
-    p1, = ax1.plot(df[x], df[y1], label=y1_label)
-    p2, = ax2.plot(df[x], df[y2], label=y2_label)
-    
-    leg = plt.legend(loc='best')
-    ax1.yaxis.get_label().set_color(p1.get_color())
-    leg.texts[0].set_color(p1.get_color())
+	if x_label is None:
+		x_label=x
+	if y1_label is None:
+		y1_label=y1
+	if y2_label is None:
+		y2_label=y2
+	fig = plt.figure(figsize=[12,6])
+	ax1 = host_subplot(111)
+	ax2 = ax1.twinx()
+	
+	ax1.set_xlabel(x)
+	ax1.set_ylabel(y1_label)
+	ax2.set_ylabel(y2_label)
+	
+	p1, = ax1.plot(df[x], df[y1], label=y1_label)
+	p2, = ax2.plot(df[x], df[y2], label=y2_label)
+	
+	leg = plt.legend(loc='best')
+	ax1.yaxis.get_label().set_color(p1.get_color())
+	leg.texts[0].set_color(p1.get_color())
 
-    ax2.yaxis.get_label().set_color(p2.get_color())
-    leg.texts[1].set_color(p2.get_color())
-    
-    plt.title(title)
+	ax2.yaxis.get_label().set_color(p2.get_color())
+	leg.texts[1].set_color(p2.get_color())
+	
+	plt.title(title)
 
-    plt.show()
-    return fig
+	# plt.show()
+	return fig
 
 
 def cal_evaluate_classier(df,y_real,y_pred,label=''):
@@ -584,12 +585,77 @@ def cal_evaluate_classier(df,y_real,y_pred,label=''):
 	return pd.DataFrame([[cnt,cnt_bad,rate_bad,auc,ks]],columns=['样本数','坏样本数','坏样本率','auc','ks'])
 
 
-def cal_vintage(df,passdue_day=30,mob_method=):
+
+class  Vintage:
+	"""
+	vintage 计算
+	df ： loan_id loan_amount loan_time loan_term
+		  plan_id term_no due_time repay_time plan_prin_amt【应还本金】 act_prin_amt【实还本金】
+		  repay_time 如果未还款，则为null 
+
+	"""
+	def __init__(self, mod_method='month',overdue_method=1):
+		'''
+		mod_method 观察日口径，分月末时点和期末时点
+		月末时点 month：
+		6-2号放款，mob0 = 6-2号到6-30号；mob1 = 6-2号到7-31号
+		期末时点 term：
+		6-2号放款：mob0 = 6-2号到7-2号；mob1=6-2号到8-2号
+		逾期计算方式 overdue_method 
+		1：曾经逾期，也为逾期； 2：截止到观察日，如果曾经逾期但结清，则为未逾期
+		'''
+		self.mod_method = mod_method
+		self.overdue_method=overdue_method
+
+	def cal_mod_date(self,loan_time,mob_num=0):
+		'''
+		mob_num: 账龄；0，1，2，对应mob0,mob1...
+		'''
+		loan_time=pd.to_datetime(loan_time)
+		if self.mod_method=='month':
+			# 下个月月份
+			tmp=loan_time+dateutil.relativedelta.relativedelta(months=mob_num+1)
+			# 账龄月末
+			tmp=datetime.date(tmp.year,tmp.month,1)+datetime.timedelta(days=-1)
+			return tmp.date()
+		elif self.mod_method=='term':
+			# 期末时点，这块假设每期30天
+			tmp=loan_time+datetime.timedelta(days=(mob_num+1) * 30)
+			return tmp.date()
+		else:
+			raise ValueError('mod_method must be month or term ')
+
+		raise ValueError('loan_time error')
+
+	def get_mod_date(self,df):
+
+		# 最大账龄
+		mob_max=df.loan_term.max()
+		res=[]
+		for i in range(0,mob_max+1):
+			df['mob']=i
+			df['mob_date']=df.loan_time.apply(lambda x:self.cal_mod_date(x,i))
+			res.append(df)
+		return pd.concat(res)
+
+	def get_passdue_(self,df):
+		'''
+		计算逾期天数
+		'''
+
+
+
+
+
+
+
+
+def cal_vintage(df,passdue_day=30,mob_method=1):
 
 	'''
 	df ： loan_id loan_amount loan_time loan_term
-	      plan_id term_no due_time repay_time plan_prin_amt【应还本金】 act_prin_amt【实还本金】 repay_status
-	      repay_time：如果未还款，则为null
+		  plan_id term_no due_time repay_time plan_prin_amt【应还本金】 act_prin_amt【实还本金】 repay_status
+		  repay_time：如果未还款，则为null
 	mob_method: mob 的计算方法，2种方式，1种是月末节点；1种是期末时点
 	MOB0：放款日到当月月底
 	MOB1:放款后的第二个完整的自然月
@@ -610,11 +676,13 @@ def cal_vintage(df,passdue_day=30,mob_method=):
 	曾经逾期：截止到观察点，只要用户曾经发生过逾期,不管观察点是否结清，都认为这笔借据逾期；
 			 保证了vintage 曲线单调不减;站在观察日的角度计算逾期天数
 	当前逾期：用户在观察点上当前是否处于逾期状态；如果结清，则认为正常；
-	         vintage 曲线可能先上后降;站在观察日的角度计算逾期天数
+			 vintage 曲线可能先上后降;站在观察日的角度计算逾期天数
 
 	'''
 
 	# df 中计算 观察日 mod_date 
+
+
 
 	# 计算逾期天数
 	df.mod_date=pd.to_datetime(df.mod_date)
@@ -665,9 +733,7 @@ def cal_vintage(df,passdue_day=30,mob_method=):
 	# 分母：放款本金；分子：逾期未还本金
 
 
-
-
-
-	
-
-
+def cal_roll_rate(df):
+	'''
+	滚动率
+	'''
