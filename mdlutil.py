@@ -594,7 +594,7 @@ class  Vintage:
 		  repay_time 如果未还款，则为null 
 
 	"""
-	def __init__(self, mod_method='month',overdue_method=1):
+	def __init__(self, flag_m=30,mod_method='month',overdue_method='over'):
 		'''
 		mod_method 观察日口径，分月末时点和期末时点
 		月末时点 month：
@@ -602,10 +602,13 @@ class  Vintage:
 		期末时点 term：
 		6-2号放款：mob0 = 6-2号到7-2号；mob1=6-2号到8-2号
 		逾期计算方式 overdue_method 
-		1：曾经逾期，也为逾期； 2：截止到观察日，如果曾经逾期但结清，则为未逾期
+		over：曾经逾期，也为逾期； current：截止到观察日，如果曾经逾期但结清，则为未逾期
+
+		flag_m:逾期标志；>30,贼m1;
 		'''
 		self.mod_method = mod_method
 		self.overdue_method=overdue_method
+		self.flag_m=flag_m
 
 	def cal_mod_date(self,loan_time,mob_num=0):
 		'''
@@ -638,10 +641,100 @@ class  Vintage:
 			res.append(df)
 		return pd.concat(res)
 
-	def get_passdue_(self,df):
+	def get_passdue_day(self,df):
 		'''
-		计算逾期天数
+		计算逾期天数 2种口径计算方法
+		曾经逾期口径、当前口径逾期天数
+		截止到观察日的逾期天数
 		'''
+		df.mod_date=pd.to_datetime(df.mod_date).dt.date
+		df.due_time=pd.to_datetime(df.due_time).dt.date 
+		df.repay_time=pd.to_datetime(df.repay_time).dt.date 
+
+		df['overdue_day']=np.nan 
+		# 如果还款日未到观察日，则未逾期
+		con=df.due_time>=df.mod_date
+		df.loc[con,'overdue_day']=0
+
+		# 当前日
+		curr_date=datetime.datetime.now().date
+
+		# 应还日，当前日 观察日 且未还款
+		con=(df.repay_time.isna()) & (df.due_time < df.mod_date) & (curr_date < df.mod_date)
+		df.loc[con,'overdue_day']=(curr_date-df[con].due_time).dt.days
+
+		# 应还日，观察日 当前日 且未还款
+		con=(df.repay_time.isna()) & (df.due_time < df.mod_date) & (curr_date >= df.mod_date)
+		df.loc[con,'overdue_day']=(df[con].mod_date-df[con].due_time).dt.days
+
+		# 应还日，观察日，还款日 且已还款
+		con=(df.repay_time >= df.mod_date) & (df.due_time<df.mod_date)
+		df.loc[con,'overdue_day']=(df[con].mod_date-df[con].due_time).dt.days 
+
+		# 应还日，还款日，当前日，观察日 且已还款
+		con=(df.repay_time < df.mod_date) & (curr_date > df.repay_time)
+		df.loc[con,'overdue_day']=(df[con].repay_time-df[con].due_time).dt.days
+
+		#  应还日，当前日，还款日，观察日 且已还款
+		con=(curr_date < df.repay_time) & (df.repay_time < df.mod_date)
+		df.loc[con,'overdue_day']=(curr_date-df[con].due_time).dt.days 
+
+		if self.overdue_method=='current':
+			# 观察日之前结清
+			con=(df.repay_time < df.mod_date)
+			df.loc[con,'overdue_day']=0
+
+		# 有些提前还款的
+		con=df.overdue_day < 0 
+		df.loc[con,'overdue_day']=0
+		return df 
+
+	def get_vintage_detail(self,df):
+		'''
+		vintage 计算的明细，每笔订单的 放款详情、剩余未还本金、label
+		'''
+		mob_max=df.loan_term.max()
+		res=[]
+		for i in range(0,mob_max+1):
+			# 观察日计算
+			df['mob']=i
+			t=df[['loan_id','loan_time']].drop_duplicates(['loan_id'])
+			t['mob_date']=t.loan_time.apply(lambda x:self.cal_mod_date(x,i))
+			if 'mod_date' in df.columns:
+				df.drop(['mod_date'],axis=1,inplace=True)
+			df=df.merge(t,on='loan_id',how='left')
+			# 逾期天数
+			df=self.get_passdue_day(df)
+			# 逾期标志
+			df['label']=0
+			df.loc[df.overdue_day > self.flag_m,'label']=1
+			# 剩余本金
+			cols=['loan_id','loan_amount','loan_term','loan_time','mod','mod_date']
+			gp=df.groupby(cols).label.max().reset_index()
+
+			tmp=df[(df.loan_id.isin(df[df.label==1].loan_id)) & (df.repay_time < df.mod_date)].groupby(cols).act_prin_amt.sum().reset_index()
+			gp=gp.merge(tmp,on=cols,how='left')
+			gp.act_prin_amt.fillna(0,inplace=True)
+			gp['逾期未还本金']=gp.loan_amount-gp.act_prin_amt
+			res.append(gp)
+
+		df_v=pd.concat(res)
+		df_v['loan_month']=pd.to_datetime(df_v.loan_time).dt.strftime('%Y-%m')
+		return df_v 
+		
+
+	def cal_vintage(self,df):
+		'''
+		vintage 统计计算，这个只是 loan_month,mob 进行了统计
+		如果需要更详细的 基于期数，渠道等的统计，则get_vintage_detail，在进行计算
+		'''
+		df_v=self.get_vintage_detail(df)
+		gp=df_v.groupby(['loan_month','mob']).agg(放款本金=('loan_amount','sum'),逾期剩余未还本金=('逾期未还本金','sum'),
+			loan_cnt=('loan_id','count'),逾期样本量=('label','sum')).reset_index()
+		gp['vintage']=np.round(gp['逾期剩余未还本金']/gp['放款本金'],3)
+		# 画图
+
+		return gp 
 
 
 
@@ -650,87 +743,20 @@ class  Vintage:
 
 
 
-def cal_vintage(df,passdue_day=30,mob_method=1):
-
-	'''
-	df ： loan_id loan_amount loan_time loan_term
-		  plan_id term_no due_time repay_time plan_prin_amt【应还本金】 act_prin_amt【实还本金】 repay_status
-		  repay_time：如果未还款，则为null
-	mob_method: mob 的计算方法，2种方式，1种是月末节点；1种是期末时点
-	MOB0：放款日到当月月底
-	MOB1:放款后的第二个完整的自然月
-	MOB2:放款后的第三个完整的自然月
-	MOB 同 loan_term 有关
-	不同时间点的借据，表现期的长度不一样，比如：
-	假设放款日在6月3号，第一个还款日为7-3号，mob1_date=7-31,逾期表现有28天
-	假设放款日在6-27号，第一个还款日为7-27号，mob1_date=7-31，逾期表现有4天
-	解决表现不一样问题，可以使用期末时点
-
-	MOB0：放款日到term_no=1的due_time时间
-
-	MOB1:term_no=1的due_time 到 term_no=2的due_time
-	观察日：mob_date ；同每一期交叉
-	比如：7-31号  term_no=1;term_no=2;term_no=3
-		 8-31号  term_no=1;term_no=2;term_no=3
-
-	曾经逾期：截止到观察点，只要用户曾经发生过逾期,不管观察点是否结清，都认为这笔借据逾期；
-			 保证了vintage 曲线单调不减;站在观察日的角度计算逾期天数
-	当前逾期：用户在观察点上当前是否处于逾期状态；如果结清，则认为正常；
-			 vintage 曲线可能先上后降;站在观察日的角度计算逾期天数
-
-	'''
-
-	# df 中计算 观察日 mod_date 
 
 
 
-	# 计算逾期天数
-	df.mod_date=pd.to_datetime(df.mod_date)
-	df.due_time=pd.to_datetime(df.due_time)
-	df.repay_time=pd.to_datetime(df.repay_time)
 
-	df['ever口径逾期天数']=np.nan 
-	# 站在观察日的角度看，未到还款日
-	df.loc[df.mod_date <= df.due_time,'ever口径逾期天数']=0
 
-	  
-	# 站在观察日的角度看，已到还款日,但是仍然未还款的情况
-	con=(df.mod_date > df.due_time) & (df.repay_time.isna())
-	df.loc[con,'ever口径逾期天数'] = (df[con].mod_date-df[con].due_time).dt.days
-	# 站在观察日的角度看，已还款但是还款日>观察日
-	con=(df.repay_time.notna()) & (df.repay_time > df.mod_date) & (df.mod_date > df.due_time)
-	df.loc[con,'ever口径逾期天数']=(df[con].mod_date-df[con].due_time).dt.days
-	# 站在观察日的角度看，已还款但是还款日<观察日 
-	con=(df.repay_time.notna()) & (df.repay_time <= df.mod_date) & (df.repay_time < datetime.datetime.now().date())
-	df.loc[con,'ever口径逾期天数']=(df[con].repay_time-df[con].due_time).dt.days
-	# 站在观察日的角度看，应还日  当前日 还款日 观察日
-	con=(df.repay_time.notna()) & (df.repay_time <= df.mod_date) & (df.repay_time > datetime.datetime.now().date())
-	df.loc[con,'ever口径逾期天数']=(datetime.datetime.now().date()-df[con].due_time).dt.days
+		
 
-	# 计算current 口径
-	df['当前逾期口径逾期天数']=df['ever口径逾期天数']
-	# 站在观察日的角度看，已还款但是还款日<观察日
-	con=(df.repay_time.notna()) & (df.repay_time <= df.mod_date)
-	df.loc[con,'当前逾期口径逾期天数']=0
 
-	# 账龄=mod_date - loan_time 的月份
-	df['mob']=(df.mod_date-df.loan_time).dt.month
 
-	# 剩余未还本金，假设M1，每一期判断是否M1，计算凡是有M1的贷款的当前的剩余未还本金
-	# loan_id 为维度，计算剩余未还本金，贷款本金-还款日还了的本金
-	t=df[df['ever口径逾期天数']>passdue_day].drop_duplicates(['loan_id','mob'])
-	t['ever口径逾期']=1
-	gp=df[['loan_id','mob','loan_amount','mob_date','loan_term','loan_time']].drop_duplicates(['loan_id','mob'])
-	gp=gp.merge(t[['loan_id','mob','ever口径逾期']],on=['loan_id','mob'],how='left')
-	gp=gp['ever口径逾期'].fillna(0)
-	# mob 账龄下，loan_id 逾期的标记
-	df=df.merge(t[['loan_id','mob','ever口径逾期']],on=['loan_id','mob'],how='left')
-	t=df[(df['ever口径逾期']==1) & (df.repay_time < df.mod_date)].groupby(['loan_id','mob'])['act_prin_amt'].sum().reset_index().rename(columns={'act_prin_amt':'逾期已还本金'})
-	gp=gp.merge(t,on=['loan_id','mob'],how='left')
-	gp['逾期未还本金']=gp['loan_amount']-gp['逾期已还本金']
 
-	# vintage 计算-- 统计为放款月份
-	# 分母：放款本金；分子：逾期未还本金
+
+
+
+
 
 
 def cal_roll_rate(df):
