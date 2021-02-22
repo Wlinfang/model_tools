@@ -738,27 +738,6 @@ class  Vintage:
 
 
 
-
-
-
-
-
-
-
-
-
-
-		
-
-
-
-
-
-
-
-
-
-
 def cal_roll_rate(df):
 	'''
 	滚动率
