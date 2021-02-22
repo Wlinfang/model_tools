@@ -622,8 +622,8 @@ class  Vintage:
 			tmp=datetime.date(tmp.year,tmp.month,1)+datetime.timedelta(days=-1)
 			return tmp.date()
 		elif self.mod_method=='term':
-			# 期末时点，这块假设每期30天
-			tmp=loan_time+datetime.timedelta(days=(mob_num+1) * 30)
+			# 期末时点，这块假设每期32天，规定是到期第二天
+			tmp=loan_time+datetime.timedelta(days=(mob_num+1) * 32)
 			return tmp.date()
 		else:
 			raise ValueError('mod_method must be month or term ')
