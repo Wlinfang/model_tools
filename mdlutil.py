@@ -762,7 +762,46 @@ class  FlowRate:
 		mod_date_name:截止到观察日的逾期天数
 		'''
 		df['overdue_day']=np.nan 
-		# 如果
+		df.repay_time=pd.to_datetime(df.repay_time).dt.date
+		df[mod_date_name]=pd.to_datetime(df[mod_date_name]).dt.date
+		curr_date=datetime.datetime.now().date()
+		# 还款日一定小于当前日
+		# 如果due_time 还款日 观察日
+		con = (df.repay_time < df[mod_date_name])
+		df.loc[con,'overdue_day']=(df[con].repay_time-df[con].due_time).dt.days
+		# 如果due_time   观察日 还款日
+		con=(df.repay_time > df[mod_date_name]) 
+		df.loc[con,'overdue_day']=(df[con][mod_date_name]-df[con].due_time).dt.days
+
+		# 如果未还款 due_time  观察日 当前日
+		con=(df.repay_time.isna()) & (df[mod_date_name] < curr_date)
+		df.loc[con,'overdue_day']=(df[con][mod_date_name]-df[con].due_time).dt.days
+		# 如果未还款 due_time  当前日 观察日
+		con=(df.repay_time.isna()) & (df[mod_date_name] >= curr_date)
+		df.loc[con,'overdue_day']=(curr_date-df[con].due_time).dt.days
+
+		df['overdue_m']=np.nan
+		df.loc[df.overdue_day < 1,'overdue_m']='m0'
+		con=(df.overdue_day >=1) & (df.overdue_day <31)
+		df.loc[con,'overdue_m']='m1'
+		con=(df.overdue_day >=31) & (df.overdue_day <61)
+		df.loc[con,'overdue_m']='m2'
+		con=(df.overdue_day >=61) & (df.overdue_day <91)
+		df.loc[con,'overdue_m']='m3'
+		con=(df.overdue_day >=91) & (df.overdue_day <121)
+		df.loc[con,'overdue_m']='m4'
+		con=(df.overdue_day >=121) & (df.overdue_day <151)
+		df.loc[con,'overdue_m']='m5'
+		con=(df.overdue_day >=151) & (df.overdue_day <181)
+		df.loc[con,'overdue_m']='m6'
+		con=(df.overdue_day >=181) 
+		df.loc[con,'overdue_m']='m7+'
+
+		return df 
+
+
+
+
 
 
 
