@@ -799,6 +799,12 @@ class  FlowRate:
 
 		return df 
 
+	def get_flow_rate_detail(self,df):
+		'''
+		每笔订单的流动
+		'''
+		
+
 
 
 
