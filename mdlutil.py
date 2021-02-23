@@ -737,6 +737,37 @@ class  Vintage:
 		return gp 
 
 
+class  FlowRate:
+	"""
+	迁徙率 计算，月末时点观察
+	某个订单在本月的逾期状态转换为下个月的逾期状态
+	df ： loan_id loan_amount loan_time loan_term
+		  plan_id term_no due_time repay_time plan_prin_amt【应还本金】 act_prin_amt【实还本金】
+		  repay_time 如果未还款，则为null 
+	"""
+	def __init__(self,flag_m=30):
+		'''
+		flag_m:逾期标志；>30,则为m1;
+		'''
+		self.mod_method = mod_method
+		self.overdue_method=overdue_method
+		self.flag_m=flag_m
+	def cal_mod_date(self):
+		'''
+		观察日计算
+		'''
+	def get_passdue_day(self,df,mod_date_name):
+		'''
+		计算逾期天数
+		mod_date_name:截止到观察日的逾期天数
+		'''
+		df['overdue_day']=np.nan 
+		# 如果
+
+
+
+
+ 
 
 def cal_roll_rate(df):
 	'''
