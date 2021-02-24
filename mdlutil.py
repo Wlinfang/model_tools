@@ -533,6 +533,32 @@ def plot_line_with_doubley(df,x,y1,y2,x_label=None,y1_label=None,y2_label=None,t
 	return fig
 
 
+def get_model_describe(df,feature_name,label,feature_grid=[],n_bins=10,is_same_width=False,default_value=None):
+	'''
+	对模型分或单特征进行简单的描述评估
+	返回 auc,ks,逾期率,样本数，样本量，iv
+	'''
+	cnt=df.shape[0]
+	cnt_bad=df[label].sum()
+	rate_bad=np.round(df[label].mean(),3)
+	# 缺失值样本量
+	cnt_miss=df[df[feature_name].isna()].shape[0]
+	rate_miss=np.round(cnt_miss/cnt,3)
+	# 缺失值的逾期率
+	rate_miss_bad=np.round(df[df[feature_name].isna()][label].mean(),3)
+	# 未缺失
+	t=df[df[feature_name].notna()]
+	cnt_nmiss=t.shape[0]
+	rate_nmiss_rate=np.round(t[label].mean(),3)
+	auc=roc_auc_score(t[label],t[feature_name])
+	fpr, tpr, thr = roc_curve(t[label],t[feature_name])
+	ks = max(abs(tpr - fpr))
+
+	iv=cal_iv(df=df,feature_name=feature_name,label=label,feature_grid=feature_grid,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
+	return pd.DataFrame([cnt,cnt_bad,rate_bad,cnt_miss,rate_miss,rate_miss_bad,cnt_nmiss,rate_nmiss_rate,auc,ks,iv],
+		columns=['样本数','坏样本数','坏样本率','缺失数','缺失比例','特征缺失坏样本率','特征未缺失数','未缺失坏样本率','auc','ks','iv'])
+	
+
 def cal_evaluate_classier(df,y_real,y_pred,label=''):
 	
 	'''
