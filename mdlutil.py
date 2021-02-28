@@ -533,6 +533,32 @@ def plot_line_with_doubley(df,x,y1,y2,x_label=None,y1_label=None,y2_label=None,t
 	return fig
 
 
+def get_model_describe(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,default_value=None):
+	'''
+	对模型分或单特征进行简单的描述评估
+	返回 auc,ks,逾期率,样本数，样本量，iv
+	'''
+	cnt=df.shape[0]
+	cnt_bad=df[label].sum()
+	rate_bad=np.round(df[label].mean(),3)
+	# 缺失值样本量
+	cnt_miss=df[df[feature_name].isna()].shape[0]
+	rate_miss=np.round(cnt_miss/cnt,3)
+	# 缺失值的逾期率
+	rate_miss_bad=np.round(df[df[feature_name].isna()][label].mean(),3)
+	# 未缺失
+	t=df[df[feature_name].notna()]
+	cnt_nmiss=t.shape[0]
+	rate_nmiss_rate=np.round(t[label].mean(),3)
+	auc=roc_auc_score(t[label],t[feature_name])
+	fpr, tpr, thr = roc_curve(t[label],t[feature_name])
+	ks = max(abs(tpr - fpr))
+
+	iv=cal_iv(df=df,feature_name=feature_name,label=label,feature_grid=feature_grid,n_bin=n_bin,is_same_width=is_same_width,default_value=default_value)
+	return pd.DataFrame([[cnt,cnt_bad,rate_bad,cnt_miss,rate_miss,rate_miss_bad,cnt_nmiss,rate_nmiss_rate,auc,ks,iv]],
+		columns=['样本数','坏样本数','坏样本率','缺失数','缺失比例','特征缺失坏样本率','特征未缺失数','未缺失坏样本率','auc','ks','iv'])
+	
+
 def cal_evaluate_classier(df,y_real,y_pred,label=''):
 	
 	'''
@@ -737,19 +763,71 @@ class  Vintage:
 		return gp 
 
 
-class FlowRate:
-	'''
-	迁徙率分析
+class  FlowRate:
+	"""
+	迁徙率 计算，月末时点观察
 	迁移率 = 前一期逾期金额到下一期逾期金额的转化率
 	M0-M1 = 当月进入M1的贷款余额 / 上月末M0的贷款余额
-	df:
-	'''
-	def __init__(self, ):
+	df ： loan_id loan_amount loan_time loan_term
+		  plan_id term_no due_time repay_time plan_prin_amt【应还本金】 act_prin_amt【实还本金】
+		  repay_time 如果未还款，则为null 
+	"""
+	def __init__(self,flag_m=30):
+		'''
+		flag_m:逾期标志；>30,则为m1;
+		'''
+		self.mod_method = mod_method
+		self.overdue_method=overdue_method
+		self.flag_m=flag_m
+	def cal_mod_date(self):
+		'''
+		观察日计算
+		'''
+	def get_passdue_day(self,df,mod_date_name):
+		'''
+		计算逾期天数
+		mod_date_name:截止到观察日的逾期天数
+		'''
+		df['overdue_day']=np.nan 
+		df.repay_time=pd.to_datetime(df.repay_time).dt.date
+		df[mod_date_name]=pd.to_datetime(df[mod_date_name]).dt.date
+		curr_date=datetime.datetime.now().date()
+		# 还款日一定小于当前日
+		# 如果due_time 还款日 观察日
+		con = (df.repay_time < df[mod_date_name])
+		df.loc[con,'overdue_day']=(df[con].repay_time-df[con].due_time).dt.days
+		# 如果due_time   观察日 还款日
+		con=(df.repay_time > df[mod_date_name]) 
+		df.loc[con,'overdue_day']=(df[con][mod_date_name]-df[con].due_time).dt.days
 
-	def cal_mod_date(self,)
+		# 如果未还款 due_time  观察日 当前日
+		con=(df.repay_time.isna()) & (df[mod_date_name] < curr_date)
+		df.loc[con,'overdue_day']=(df[con][mod_date_name]-df[con].due_time).dt.days
+		# 如果未还款 due_time  当前日 观察日
+		con=(df.repay_time.isna()) & (df[mod_date_name] >= curr_date)
+		df.loc[con,'overdue_day']=(curr_date-df[con].due_time).dt.days
 
+		df['overdue_m']=np.nan
+		df.loc[df.overdue_day < 1,'overdue_m']='m0'
+		con=(df.overdue_day >=1) & (df.overdue_day <31)
+		df.loc[con,'overdue_m']='m1'
+		con=(df.overdue_day >=31) & (df.overdue_day <61)
+		df.loc[con,'overdue_m']='m2'
+		con=(df.overdue_day >=61) & (df.overdue_day <91)
+		df.loc[con,'overdue_m']='m3'
+		con=(df.overdue_day >=91) & (df.overdue_day <121)
+		df.loc[con,'overdue_m']='m4'
+		con=(df.overdue_day >=121) & (df.overdue_day <151)
+		df.loc[con,'overdue_m']='m5'
+		con=(df.overdue_day >=151) & (df.overdue_day <181)
+		df.loc[con,'overdue_m']='m6'
+		con=(df.overdue_day >=181) 
+		df.loc[con,'overdue_m']='m7+'
 
-def cal_roll_rate(df):
-	'''
-	滚动率
-	'''
+		return df 
+
+	def get_flow_rate_detail(self,df):
+		'''
+		每笔订单的流动
+		'''
+		
