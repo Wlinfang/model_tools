@@ -737,6 +737,17 @@ class  Vintage:
 		return gp 
 
 
+class FlowRate:
+	'''
+	迁徙率分析
+	迁移率 = 前一期逾期金额到下一期逾期金额的转化率
+	M0-M1 = 当月进入M1的贷款余额 / 上月末M0的贷款余额
+	df:
+	'''
+	def __init__(self, ):
+
+	def cal_mod_date(self,)
+
 
 def cal_roll_rate(df):
 	'''
