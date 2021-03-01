@@ -614,7 +614,7 @@ def cal_evaluate_classier(df,y_real,y_pred,label=''):
 
 class  Vintage:
 	"""
-	vintage 计算
+	vintage：账龄分析
 	df ： loan_id loan_amount loan_time loan_term
 		  plan_id term_no due_time repay_time plan_prin_amt【应还本金】 act_prin_amt【实还本金】
 		  repay_time 如果未还款，则为null 
