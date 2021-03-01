@@ -828,6 +828,11 @@ class  FlowRate:
 
 	def get_flow_rate_detail(self,df):
 		'''
-		每笔订单的流动
+		每笔订单的流动-- mod_date 当前日期，loan_id,每一笔订单的剩余本金
 		'''
+		df=self.get_passdue_day(df,'mod_date')
+		cur
+
+
+
 		
