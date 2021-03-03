@@ -191,9 +191,9 @@ def cal_feature_grid(df,feature_name,n_bin=10,is_same_width=True,default_value=N
 		else:
 			bin_index = [i / n_bin for i in range(0, n_bin + 1)]
 			f=sorted(set(tmp[feature_name].quantile(bin_index)))
-	# 包括无穷大，样本集中数据可能有些最小值，最大值不全
-	f[0]=-np.Inf
-	f[-1]=np.inf
+		# 包括无穷大，样本集中数据可能有些最小值，最大值不全
+		f[0]=-np.Inf
+		f[-1]=np.inf
 	return np.round(f,3)
 
 
