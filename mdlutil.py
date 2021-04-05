@@ -790,7 +790,8 @@ class  Vintage:
 class  FlowRate:
 	"""
 	迁徙率 计算，月末时点观察
-	某个订单在本月的逾期状态转换为下个月的逾期状态
+	迁移率 = 前一期逾期金额到下一期逾期金额的转化率
+	M0-M1 = 当月进入M1的贷款余额 / 上月末M0的贷款余额
 	df ： loan_id loan_amount loan_time loan_term
 		  plan_id term_no due_time repay_time plan_prin_amt【应还本金】 act_prin_amt【实还本金】
 		  repay_time 如果未还款，则为null 
@@ -851,20 +852,11 @@ class  FlowRate:
 
 	def get_flow_rate_detail(self,df):
 		'''
-		每笔订单的流动
+		每笔订单的流动-- mod_date 当前日期，loan_id,每一笔订单的剩余本金
 		'''
+		df=self.get_passdue_day(df,'mod_date')
+		cur
+
+
+
 		
-
-
-
-
-
-
-
-
- 
-
-def cal_roll_rate(df):
-	'''
-	滚动率
-	'''
