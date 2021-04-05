@@ -384,7 +384,31 @@ def cal_pdp(df,feature_name,model_name,feature_grid=[],n_bin=10,is_same_width=Fa
 	return gp[out_cols]
 
 
-
+def eval_miss(df,feature_name,label,classes=['train_or_test']):
+	'''
+	评估缺失率的影响
+	'''
+	gp=df.groupby(classes).apply(lambda x:cal_describe(x,[feature_name])).reset_index()
+	gp=gp[classes+['feature_name','all_count','count','miss_rate']]
+	gp=gp.merge(df.groupby(classes)[label].mean().reset_index().rename(columns={label:'坏样本率'}),on=classes,how='left')
+	df['is_miss']=0
+	df.loc[df[feature_name].isna(),'is_miss']=1
+	gp_rate=cal_y_by_classes(df,label,sub_classes=classes+['is_miss'],classes=classes)
+	gp_no=gp_rate[gp_rate.is_miss==0][classes+['样本数','坏样本率','样本比例']]
+	gp_yes=gp_rate[gp_rate.is_miss==1][classes+['样本数','坏样本率','样本比例']]
+	
+	gp=gp.merge(gp_no,on=classes,how='left')
+	gp=gp.merge(gp_yes,on=classes,how='left')
+	if len(classes)==1:
+		gp.index=gp[classes[0]]
+	else:
+		gp.index=gp[classes]
+	gp.drop(classes,inplace=True,axis=1)
+	gp.columns=pd.Index([('整体','特征名'),('整体','样本量'),('整体','有值量'),('整体','缺失率'),('整体','坏样本率'),
+		  ('未缺失','样本数'),('未缺失','坏样本率'),('未缺失','样本比例'),
+		 ('缺失','样本数'),('缺失','坏样本率'),('缺失','样本比例')])
+	return gp
+	
 
 def cal_woe(df,feature_name,label,feature_grid=[],n_bin=10,is_same_width=False,default_value=None):
 	'''
