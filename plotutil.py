@@ -1,5 +1,8 @@
 import pandas as pd
 import seaborn as sn 
+import base64 
+import os 
+
 import matplotlib.pyplot as plt
 import matplotlib.style as psl 
 from mpl_toolkits.axes_grid1 import host_subplot
@@ -18,7 +21,8 @@ plt.rcParams['savefig.dpi'] = 300 # 保存的图片像素
 plt.rcParams['figure.dpi'] = 300 #分辨率
 plt.rcParams['image.interpolation'] = 'nearest' # 设置 interpolation style
 plt.rcParams['image.cmap'] = 'gray' # 设置 颜色 style
-
+# padding bbox
+plt.rcParams['figure.autolayout']=True
 
 def plot_hist_and_line(df,x,y_hist,y_line,title='',is_show=True):
 	'''
@@ -145,3 +149,39 @@ def gradient_color(color_list, color_sum=700,is_show=True):
     	sn.palplot(color_map)
     return color_map
 
+
+def gradient_color_by_palette(color_sum=10,is_show=True):
+	'''
+	利用调色板自定义颜色变化
+	'''
+	colors=sn.color_palette("Blues",n_colors=10)
+	# colors 中返回的rgb 在 0-1之间
+	df=pd.DataFrame(np.array(colors)*256,columns=['R','G','B'])
+	df['hex']=df.apply(lambda x:RGB_to_Hex([x.R,x.G,x.B]),axis=1)
+	if is_show:
+		sn.palplot(df.hex)
+	return df 
+
+
+def draw_table(ax,df,cols):
+	'''
+	画表格图像
+	'''
+    ax.set_axis_off()
+    table=ax.table(df[cols].values,colLabels=cols,loc='center')
+    table.auto_set_column_width(True)
+    table.auto_set_font_size(True)
+    # fig.savefit(bbox_inches='tight')
+    # key, cell in table.get_celld().items()
+    return table
+
+def img_to_base64(file_path,file_name):
+	'''
+	图片base64 编码
+	如果是发送邮件，则进行图片编码'<img src="data:image/png;base64,{img_64}">'.format(img_64=img_64)
+	'''
+	if os.path.exists(os.path.join(file_path,file_name)):
+		with open(os.path.join(file_path,file_name),'rb') as file:
+			img_data = fp.read()
+	        img_64 = base64.b64encode(img_data).decode()
+	        return img_64
