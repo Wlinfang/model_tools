@@ -80,10 +80,19 @@ def plot_line_with_doubley(df,x,y1,y2,x_label=None,y1_label=None,y2_label=None,t
 def RGB_to_Hex(rgb):
 	'''
 	RGB格式颜色转换为16进制颜色格式
-	RGB 格式: '100, 100,100'
+	RGB 格式: '100, 100,100'  or (100, 100,100)
 	16进制格式:'#0F0F0F'
 	'''
-    RGB = rgb.split(',')  # 将RGB格式划分开来
+	if isinstance(rgb,str):
+    	RGB = rgb.split(',')  # 将RGB格式划分开来
+    elif isinstance(rgb,tuple):
+    	RGB = list(rgb)
+    elif isinstance(rgb,list):
+    	RGB=rgb
+    else:
+    	raise ValueError('rgb format error ')
+    if len(rgb) !=3:
+    	raise ValueError('rgb must having 3 value')
     color = '#'
     for i in RGB:
         num = int(i)
@@ -93,7 +102,9 @@ def RGB_to_Hex(rgb):
 def Hex_to_RGB(hex):
 	'''
 	16进制颜色格式颜色转换为RGB格式
-
+	RGB 格式: '100, 100,100'  or (100, 100,100)
+	16进制格式:'#0F0F0F'
+	返回：'100, 100,100' and (100, 100,100) 两种格式的颜色
 	'''
     r = int(hex[1:3], 16)
     g = int(hex[3:5], 16)
@@ -102,8 +113,7 @@ def Hex_to_RGB(hex):
     return rgb, [r, g, b]
 
 
-
-def gradient_color(color_list, color_sum=700):
+def gradient_color(color_list, color_sum=700,is_show=True):
 	'''
 	生成渐变色
 	color_list：list，16进制的颜色list
@@ -111,6 +121,8 @@ def gradient_color(color_list, color_sum=700):
 	'''
 	# 主颜色个数
     color_center_count = len(color_list)
+    if color_sum < color_center_count * 3:
+    	color_sum=color_center_count * 3
     # 两个颜色之中的个数
     color_sub_count = int(color_sum / (color_center_count - 1))
     color_index_start = 0
@@ -123,9 +135,13 @@ def gradient_color(color_list, color_sum=700):
         b_step = (color_rgb_end[2] - color_rgb_start[2]) / color_sub_count
         # 生成中间渐变色
         now_color = color_rgb_start
-        color_map.append(RGB_list_to_Hex(now_color))
+        color_map.append(RGB_to_Hex(now_color))
         for color_index in range(1, color_sub_count):
             now_color = [now_color[0] + r_step, now_color[1] + g_step, now_color[2] + b_step]
-            color_map.append(RGB_list_to_Hex(now_color))
+            color_map.append(RGB_to_Hex(now_color))
         color_index_start = color_index_end
+
+    if is_show:
+    	sn.palplot(color_map)
     return color_map
+
