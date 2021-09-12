@@ -30,6 +30,7 @@ def plot_hist_and_line(df,x,y_hist,y_line,title='',is_show=True):
 	y_hist: hist ：柱形图数据
 	y_line: line : 线性图数据
 	'''
+	print('plot')
 	fig=plt.figure(figsize=(12,6))
 	ax1 = fig.add_subplot(111)  
 	ax1.plot(df[x], df[y_line],'or-',label=y_line)
