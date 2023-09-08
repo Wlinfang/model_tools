@@ -11,7 +11,7 @@ from typing import Union
 import logging
 
 # 科学计数法全部显示
-pd.set_option('display.float_format', lambda x: '%.0f' % x)
+# pd.set_option('display.float_format', lambda x: '%.3f' % x)
 logger = logging.getLogger(__file__)
 
 

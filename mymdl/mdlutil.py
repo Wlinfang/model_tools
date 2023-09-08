@@ -204,7 +204,7 @@ def accumvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     group_cols = ['lbl_index', 'lbl', 'lbl_left']
     gp = pd.pivot_table(df, values=y, index=group_cols,
                         sort='lbl_index', aggfunc=['count', 'sum'],
-                        fill_value=0, margins=True, observed=True)
+                        fill_value=0, margins=False, observed=True)
     gp.columns = ['cnt', 'sum']
     gp['avg'] = np.round(gp['sum'] / gp['cnt'], 3)
     gp['accum_cnt'] = gp['cnt'].cumsum()
@@ -212,14 +212,19 @@ def accumvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     gp['accum_avg'] = np.round(gp['accum_sum'] / gp['accum_cnt'], 3)
     return gp
 
-def liftvar(df:pd.DataFrame,x:str,y:str,feature_grid=[],
-             cut_type=1, n_bin=10)->pd.DataFrame:
+
+def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
+            cut_type=1, n_bin=10) -> pd.DataFrame:
     """
     变量lift 分布，适用于y值二分类,对 x 变量进行分组
     :param y  坏=1   好=0
-    :param feature_grid cut_type n_bin 分组的参数
-    :return:
+    :param feature_grid cut_type[1:等频分布 2:等宽分布] n_bin 分组的参数
     """
+    # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
+    df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
+    group_cols = ['lbl', 'lbl_index', 'lbl_left']
+
+
 
 def sample_label(df, label, classes=[]) -> pd.DataFrame:
     """
