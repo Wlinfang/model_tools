@@ -4,10 +4,7 @@ from typing import Union
 
 from model_tools.utils.toolutil import del_none
 
-# import category_encoders as ce
-
 import logging
-
 logger = logging.getLogger(__file__)
 
 
@@ -184,8 +181,10 @@ def univar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
     # 对应的y mean 计算
     group_cols = ['lbl', 'lbl_index', 'lbl_left']
+    gp = pd.pivot_table(df, values=y, index=group_cols,
+                        sort='lbl_index', aggfunc=['count', 'sum'],
+                        fill_value=0, margins=False, observed=True)
     # 分组计算 y 的数量
-    gp = df.groupby(group_cols).agg({y: ['count', 'sum']})
     gp.columns = ['cnt', 'sum']
     gp['avg'] = np.round(gp['sum'] / gp['cnt'], 3)
     gp.reset_index(inplace=True)
@@ -217,31 +216,44 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
             cut_type=1, n_bin=10) -> pd.DataFrame:
     """
     变量lift 分布，适用于y值二分类,对 x 变量进行分组
-    :param y  坏=1   好=0
+    :param y  定义 坏=1   好=0
     :param feature_grid cut_type[1:等频分布 2:等宽分布] n_bin 分组的参数
     """
     # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
     group_cols = ['lbl', 'lbl_index', 'lbl_left']
+    # 分组对y 进行计算
+    gp = pd.pivot_table(df, values=y, index=group_cols,
+                        sort='lbl_index', aggfunc=['count', 'sum'],
+                        fill_value=0, margins=True, observed=True)
+    gp.columns = ['cnt', 'cnt_bad']
+    gp['cnt_good'] = gp['cnt'] - gp['cnt_bad']
+    gp['rate_bad'] = np.round(gp['cnt_bad'] / gp['cnt'], 3)
+    # 坏样本占整体坏样本比例
+    gp['rate_bad_over_allbad'] = np.round(gp['cnt_bad'] / gp.loc['All', 'cnt_bad'].values[0], 3)
+    # 好样本占整体好样本比例
+    gp['rate_good_over_allgood'] = np.round(gp['cnt_good'] / gp.loc['All', 'cnt_good'].values[0], 3)
+    # lift = bad_over_allbad_rate / bad_rate
+    gp['lift_bad'] = np.round(gp['rate_bad_over_allbad'] / gp.loc['All', 'rate_bad'].values[0], 3)
+    # lift_good = rate_good_over_allgood / (1-bad_rate)
+    gp['lift_good'] = np.round(gp['rate_good_over_allgood'] / (1 - gp.loc['All', 'rate_bad'].values[0]), 3)
+    # 累计
+    gp['accum_cnt'] = gp['cnt'].cumsum()
+    gp['accum_cnt_bad'] = gp['cnt_bad'].cumsum()
+    gp['accum_cnt_good'] = gp['cnt_good'].cumsum()
+    gp.loc['All', 'accum_cnt_bad'] = None
+    gp.loc['All', 'accum_cnt_good'] = None
+    # 累计坏用户比例
+    gp['accum_rate_bad'] = np.round(gp['accum_cnt_bad'] / gp['accum_cnt'], 3)
+    # 坏样本占整体坏样本比例
+    gp['accum_rate_bad_over_allbad'] = np.round(gp['accum_cnt_bad'] / gp.loc['All', 'cnt_bad'].values[0], 3)
+    # 好样本占整体好样本比例
+    gp['accum_rate_good_over_allgood'] = np.round(gp['accum_cnt_good'] / gp.loc['All', 'cnt_good'].values[0], 3)
+    # lift = bad_over_allbad_rate / bad_rate
+    gp['accum_lift_bad'] = np.round(gp['accum_rate_bad_over_allbad'] / gp.loc['All', 'rate_bad'].values[0], 3)
+    # lift_good = rate_good_over_allgood / (1-bad_rate)
+    gp['accum_lift_good'] = np.round(gp['accum_rate_good_over_allgood'] / (1 - gp.loc['All', 'rate_bad'].values[0]), 3)
 
-
-
-def sample_label(df, label, classes=[]) -> pd.DataFrame:
-    """
-    分组计算  正、负样本的 样本量，mean
-    label:[0,1] 二分类
-    classes:维度集合
-    lift : 分组后的 正样本率 / 整体的正样本率
-    """
-    # 总计
-    gp = pd.DataFrame([[df.shape[0], df[label].sum(), df[label].mean()]],
-                      columns=['样本量', '正样本量', '正样本率'], index=['总计'])
-    if classes:
-        tmp = df.groupby(classes).agg(样本量=(label, 'count'), 正样本量=(label, 'sum'),
-                                      正样本率=(label, 'mean')).reset_index()
-        gp = pd.concat([tmp, gp], axis=0)
-        gp['lift'] = np.round(gp['正样本率'] / gp.loc['总计', '正样本率'], 2)
-    gp['正样本率'] = np.round(gp['正样本率'], 2)
     return gp
 
 
@@ -320,11 +332,35 @@ def psi(data_base: Union[list, np.array, pd.Series],
     gp['psi'] = (gp.base_rate - gp.test_rate) * np.log((gp.base_rate + eps) / (gp.test_rate + eps))
     return np.round(gp['psi'].sum(), 2)
 
-# def woe(df, x, y, n_bins=10):
-#     """
-#     woe 计算
-#     x:list or str
-#     """
-#     if isinstance(x, str):
-#         x = [x]
-#     ce.WOEEncoder(df[x])
+
+def woe(df: pd.DataFrame, x: str, y: str, feature_grid=[], cut_type=1, n_bin=10):
+    """
+    woe = ln (坏人比例) / (好人比例)
+    坏人比例 =  组内的坏人数/ 总坏人数
+    好人比例 = 组内的好人数/ 总好人数
+    :param y 二值变量  定义 坏=1  好=0
+    """
+    gp = liftvar(df, x, y, feature_grid, cut_type, n_bin)
+    # 好人比例 = rate_good_over_allgood
+    # 坏人比例 = rate_bad_over_allbad
+
+    # 极小值
+    eps = np.finfo(np.float32).eps
+    gp['woe'] = np.round(np.log((gp['rate_bad_over_allbad'] + eps) / (gp['rate_good_over_allgood'] + eps)), 3)
+    return gp
+
+
+def iv(df: pd.DataFrame, x: str, y: str, feature_grid=[], cut_type=1, n_bin=10):
+    """
+    对 x 进行分组，对于每个组内的iv_i 求和
+    iv_i =  (坏人比例-好人比例) * woe_i
+    iv = sum(iv_i)
+    坏人比例 =  组内的坏人数/ 总坏人数
+    好人比例 = 组内的好人数/ 总好人数
+    :return   <0.02 (无用特征)  0.02~0.1（弱特征） 0.1~0.3（中价值）0.3~0.5（高价值）>0.5(数据不真实)
+    """
+    gp = woe(df, x, y, feature_grid, cut_type, n_bin)
+    # 好人比例 = rate_good_over_allgood
+    # 坏人比例 = rate_bad_over_allbad
+    gp['iv_i'] = np.round((gp['rate_bad_over_allbad'] - gp['rate_good_over_allgood']) * gp['woe'], 4)
+    return np.round(np.sum(gp['iv_i']), 2)
