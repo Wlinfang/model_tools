@@ -5,6 +5,7 @@ from typing import Union
 from model_tools.utils.toolutil import del_none
 
 import logging
+
 logger = logging.getLogger(__file__)
 
 
@@ -229,31 +230,18 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     gp.columns = ['cnt', 'cnt_bad']
     gp['cnt_good'] = gp['cnt'] - gp['cnt_bad']
     gp['rate_bad'] = np.round(gp['cnt_bad'] / gp['cnt'], 3)
-    # 坏样本占整体坏样本比例
-    gp['rate_bad_over_allbad'] = np.round(gp['cnt_bad'] / gp.loc['All', 'cnt_bad'].values[0], 3)
-    # 好样本占整体好样本比例
-    gp['rate_good_over_allgood'] = np.round(gp['cnt_good'] / gp.loc['All', 'cnt_good'].values[0], 3)
-    # lift = bad_over_allbad_rate / bad_rate
-    gp['lift_bad'] = np.round(gp['rate_bad_over_allbad'] / gp.loc['All', 'rate_bad'].values[0], 3)
-    # lift_good = rate_good_over_allgood / (1-bad_rate)
-    gp['lift_good'] = np.round(gp['rate_good_over_allgood'] / (1 - gp.loc['All', 'rate_bad'].values[0]), 3)
     # 累计
-    gp['accum_cnt'] = gp['cnt'].cumsum()
     gp['accum_cnt_bad'] = gp['cnt_bad'].cumsum()
     gp['accum_cnt_good'] = gp['cnt_good'].cumsum()
     gp.loc['All', 'accum_cnt_bad'] = None
     gp.loc['All', 'accum_cnt_good'] = None
-    # 累计坏用户比例
-    gp['accum_rate_bad'] = np.round(gp['accum_cnt_bad'] / gp['accum_cnt'], 3)
     # 坏样本占整体坏样本比例
     gp['accum_rate_bad_over_allbad'] = np.round(gp['accum_cnt_bad'] / gp.loc['All', 'cnt_bad'].values[0], 3)
     # 好样本占整体好样本比例
     gp['accum_rate_good_over_allgood'] = np.round(gp['accum_cnt_good'] / gp.loc['All', 'cnt_good'].values[0], 3)
     # lift = bad_over_allbad_rate / bad_rate
     gp['accum_lift_bad'] = np.round(gp['accum_rate_bad_over_allbad'] / gp.loc['All', 'rate_bad'].values[0], 3)
-    # lift_good = rate_good_over_allgood / (1-bad_rate)
-    gp['accum_lift_good'] = np.round(gp['accum_rate_good_over_allgood'] / (1 - gp.loc['All', 'rate_bad'].values[0]), 3)
-
+    gp.reset_index(inplace=True)
     return gp
 
 
@@ -340,13 +328,27 @@ def woe(df: pd.DataFrame, x: str, y: str, feature_grid=[], cut_type=1, n_bin=10)
     好人比例 = 组内的好人数/ 总好人数
     :param y 二值变量  定义 坏=1  好=0
     """
-    gp = liftvar(df, x, y, feature_grid, cut_type, n_bin)
     # 好人比例 = rate_good_over_allgood
     # 坏人比例 = rate_bad_over_allbad
-
+    df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
+    group_cols = ['lbl', 'lbl_index', 'lbl_left']
+    # 分组对y 进行计算
+    gp = pd.pivot_table(df, values=y, index=group_cols,
+                        sort='lbl_index', aggfunc=['count', 'sum'],
+                        fill_value=0, margins=True, observed=True)
+    gp.columns = ['cnt', 'cnt_bad']
+    gp['cnt_good'] = gp['cnt'] - gp['cnt_bad']
+    gp['rate_bad'] = np.round(gp['cnt_bad'] / gp['cnt'], 3)
+    # 坏样本占整体坏样本比例
+    gp['rate_bad_over_allbad'] = np.round(gp['cnt_bad'] / gp.loc['All', 'cnt_bad'].values[0], 3)
+    # 好样本占整体好样本比例
+    gp['rate_good_over_allgood'] = np.round(gp['cnt_good'] / gp.loc['All', 'cnt_good'].values[0], 3)
     # 极小值
     eps = np.finfo(np.float32).eps
     gp['woe'] = np.round(np.log((gp['rate_bad_over_allbad'] + eps) / (gp['rate_good_over_allgood'] + eps)), 3)
+    gp['iv_bin'] = np.round((gp['rate_bad_over_allbad'] - gp['rate_good_over_allgood']) * gp['woe'], 4)
+    gp.loc['All', ['woe', 'iv_bin']] = None
+    gp.reset_index(inplace=True)
     return gp
 
 
@@ -360,7 +362,4 @@ def iv(df: pd.DataFrame, x: str, y: str, feature_grid=[], cut_type=1, n_bin=10):
     :return   <0.02 (无用特征)  0.02~0.1（弱特征） 0.1~0.3（中价值）0.3~0.5（高价值）>0.5(数据不真实)
     """
     gp = woe(df, x, y, feature_grid, cut_type, n_bin)
-    # 好人比例 = rate_good_over_allgood
-    # 坏人比例 = rate_bad_over_allbad
-    gp['iv_i'] = np.round((gp['rate_bad_over_allbad'] - gp['rate_good_over_allgood']) * gp['woe'], 4)
-    return np.round(np.sum(gp['iv_i']), 2)
+    return np.round(np.sum(gp['iv_bin']), 2)
