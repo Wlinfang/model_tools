@@ -178,7 +178,7 @@ def univar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     """
     单变量分布：对 x 进行分组，求每组的y的均值
     :param x df 中的字段名称
-    :param feature_grid cut_type n_bin 分组的参数 get_bin
+    :param feature_grid cut_type n_bin
     """
     # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
@@ -197,7 +197,7 @@ def accumvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     """
     变量累计分布 对x 进行分组，然后累计计算每组y的均值和数量
     :param x df 中的字段名称
-    :param feature_grid cut_type n_bin 分组的参数 get_bin
+    :param feature_grid cut_type n_bin
     """
     # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
@@ -212,6 +212,14 @@ def accumvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     gp['accum_avg'] = np.round(gp['accum_sum'] / gp['accum_cnt'], 3)
     return gp
 
+def liftvar(df:pd.DataFrame,x:str,y:str,feature_grid=[],
+             cut_type=1, n_bin=10)->pd.DataFrame:
+    """
+    变量lift 分布，适用于y值二分类,对 x 变量进行分组
+    :param y  坏=1   好=0
+    :param feature_grid cut_type n_bin 分组的参数
+    :return:
+    """
 
 def sample_label(df, label, classes=[]) -> pd.DataFrame:
     """
