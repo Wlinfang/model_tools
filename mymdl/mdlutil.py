@@ -1,20 +1,23 @@
 import pandas as pd
 import numpy as np
-import pickle
-import logging
-from collections import Counter
-from utils.toolutil import del_none
+from typing import Union
 
-import category_encoders as ce 
+from model_tools.utils.toolutil import del_none
+
+# import category_encoders as ce
+
+import logging
 
 logger = logging.getLogger(__file__)
 
 
-def get_feature_grid(values, qcut_type=1, n_bin=10, default_values=[]) -> list:
+def get_feature_grid(values: Union[list, np.array],
+                     cut_type=1, n_bin=10, default_values=[]) -> list:
     """
-    返回分组 默认值和空值划分为一组
-    values:list , np.array
-    qcut_type: 1 : 等频; 2:等宽 3、
+    计算分桶
+    :param values: 要进行分桶的数据
+    :param cut_type: 1 : 等频; 2:等宽 3、
+    :return
     """
     if (values is None) or (len(values) < 1) or (n_bin <= 0):
         logger.info('param values is %s', values)
@@ -27,11 +30,11 @@ def get_feature_grid(values, qcut_type=1, n_bin=10, default_values=[]) -> list:
     # 去除空值、空字符串
     values = del_none(values)
     # 去除默认值
-    values = values[~np.isin(default_values)]
-    # 非字符型数据，直接返回
+    values = values[~np.isin(values, default_values)]
+    # 非数值型数据，直接返回
     if values.dtype.kind not in ['i', 'u', 'f', 'c']:
         return np.unique(values)
-    n = np.nunique(values).size
+    n = np.unique(values).size
     if n == 0:
         return None
     # 对values 进行排序
@@ -39,11 +42,11 @@ def get_feature_grid(values, qcut_type=1, n_bin=10, default_values=[]) -> list:
     if n <= n_bin:
         f = [-np.Inf] + vs_sort.tolist()
     else:
-        if qcut_type == 1:
+        if cut_type == 1:
             # 等频
             bin_index = [i / n_bin for i in range(0, n_bin + 1)]
             f = np.sort(np.unique(np.quantile(vs_sort, bin_index)))
-        elif qcut_type == 2:
+        elif cut_type == 2:
             # 等宽
             mi, mx = values.min(), values.max()
             bin_index = [mi + (mx - mi) * i / n_bin for i in range(0, n_bin + 1)]
@@ -56,14 +59,18 @@ def get_feature_grid(values, qcut_type=1, n_bin=10, default_values=[]) -> list:
     return np.round(f, 3)
 
 
-def get_bin(df, feature_name, qcut_type=1, n_bin=10, feature_grid=[], default_values=[]):
+def get_bin(df: pd.DataFrame, feature_name: str, cut_type=1,
+            n_bin=10, feature_grid=[], default_values=[]):
     """
     分组；默认值+缺失值为分为1组
-    feature_grid:如果未指定，则根据 qcut_type + n_bin 分组
-    返回：字段 lbl  lbl_index lbl_left
+    :param cut_type 分组类型： 1 ：等频分组；2：等宽分组
+    :param n_bin 分组个数，默认10个组；如果加入缺失值，则分为11组
+    :param feature_grid 优先按照 feature_grid 分组；如果未指定，按照cut_type
+    :return df 含有字段 lbl  lbl_index lbl_left
     """
     if (df is None) or (df.shape[0] == 0):
-        raise ValueError('data is None ')
+        logger.error('data is None ')
+        return None
     df[feature_name] = pd.to_numeric(df[feature_name], errors='ignore')
     # 分为空和非空
     t1 = df[(df[feature_name].notna()) & (~df[feature_name].isin(default_values))].copy()
@@ -74,31 +81,38 @@ def get_bin(df, feature_name, qcut_type=1, n_bin=10, feature_grid=[], default_va
         t1['lbl'] = t1[feature_name]
     if not feature_grid:
         # 如果未指定
-        feature_grid = get_feature_grid(df[feature_name], qcut_type, n_bin
+        feature_grid = get_feature_grid(df[feature_name], cut_type, n_bin
                                         , default_values)
+        if len(feature_grid) == 0:
+            logger.error('feature_grid is None ')
+            return None
     if pd.api.types.is_numeric_dtype(df[feature_name]):
-        # 数字型
-        t1['lbl'] = pd.cut(t1[feature_name], feature_grid, include_lowest=True, right=False, precision=4)
+        # 数字型 左闭右开
+        t1['lbl'] = pd.cut(t1[feature_name], feature_grid, include_lowest=True,
+                           right=False, precision=4)
 
     t1['lbl'] = t1['lbl'].astype('category')
     # 则为缺失值
     t1 = pd.concat([t1, t2], axis=0)
     # 填充空值
-    t1['lbl'] = t1['lbl'].cat.add_categories('miss data')
-    cates = t1['lbl'].cat.categories.tolist()
-    cates = [i.left if isinstance(i, pd.Interval) else i for i in cates]
+    t1['lbl'] = t1['lbl'].cat.add_categories('miss_data')
+    t1['lbl'] = t1['lbl'].fillna('miss_data')
+    cats = t1['lbl'].cat.categories.tolist()
+    cats = [i.left if isinstance(i, pd.Interval) else i for i in cats]
     t1['lbl_index'] = t1['lbl'].cat.codes
-    t1['lbl_left'] = t1.lbl_index.apply(lambda x: cates[x])
+    t1['lbl_left'] = t1.lbl_index.apply(lambda x: cats[x])
+    # 更新空值，空值为最大
+    t1.loc[t1.lbl_index == -1, 'lbl_index'] = t1.lbl_index.max() + 1
     return t1
 
 
-def split_train_val(df, split_type=1, split_ratio=0.8, sort_col=None):
+def split_train_val(df: pd.DataFrame, split_type=1, split_ratio=0.8, sort_col=None):
     """
-    将数据集进行切分，默认为随机切分
-    split_type：1：随机切分；2：按照时间切分
-    split_ratio: 切分比例； 取值范围：(0,1)
-    sort_col：按照时间切分，切分比例为 split_ratio
-    :return: train,val
+    将数据集进行切分
+    :param split_type  1：随机切分  2：按照时间切分
+    :param split_ratio  切分比例； 取值范围：(0,1)
+    :param sort_col：如果 split_type=2 根据sort_col 排序然后切分
+    :return: df_train,df_val
     """
     dftrain = df.reset_index()
     # == dftrain 中划分 训练集，验证集
@@ -118,9 +132,8 @@ def split_train_val(df, split_type=1, split_ratio=0.8, sort_col=None):
 def describe_df(df, feature_names: list) -> pd.DataFrame:
     """
     描述性分析
-    feature_names: list : 特征名称
+    :param feature_names  特征名称列表
     """
-    res = []
     # 提取数字型数据
     col_num_list = df[feature_names].select_dtypes(include=np.number).columns.tolist()
     # 字段类型
@@ -159,27 +172,45 @@ def describe_df(df, feature_names: list) -> pd.DataFrame:
     return df_num
 
 
-def univar(df: pd.DataFrame, x, y, classes=[], feature_grid=[], qcut_type=1, n_bin=10) -> pd.DataFrame:
+def univar(df: pd.DataFrame, x: str, y: str, group_cols=[], feature_grid=[],
+           cut_type=1, n_bin=10) -> pd.DataFrame:
     """
-    对 x 进行分组，对y求每组对应的均值
-    x: column of x
-    classes:维度
-    feature_grid:如果未指定，则 根据 qcut_type + n_bin 分组
+    单变量分布：对 x 进行分组，求每组的y的均值
+    :param x df 中的字段名称
+    :param group_cols 维度；先进行分组，然后在根据维度分别进行统计
+    :param feature_grid cut_type n_bin 分组的参数 get_bin
     """
     # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
-    df = get_bin(df, x, feature_grid=feature_grid, qcut_type=qcut_type, n_bin=n_bin)
+    df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
     # 对应的y mean 计算
-    if classes:
-        classes.extend(['lbl', 'lbl_index', 'lbl_left'])
+    if len(group_cols) > 0:
+        group_cols.extend(['lbl', 'lbl_index', 'lbl_left'])
     else:
-        classes = ['lbl', 'lbl_index', 'lbl_left']
-    gp = df.groupby(classes).agg({y: ['count', 'mean']})
-    gp.columns = ['count', 'mean']
+        group_cols = ['lbl', 'lbl_index', 'lbl_left']
+    # 分组计算 y 的数量
+    gp = df.groupby(group_cols).agg({y: ['count', 'mean']})
+    gp.columns = ['cnt', 'avg']
     gp.reset_index(inplace=True)
-    tmp = df.groupby(classes).size().reset_index().rename(columns={0: "total"})
-    gp = tmp.merge(gp, on=classes, how='left')
-    gp['miss_rate'] = np.round(gp['count'] / gp['total'], 3)
+    tmp = df.groupby(group_cols).size().reset_index().rename(columns={0: "total"})
+    gp = tmp.merge(gp, on=group_cols, how='left')
+    # y 值在这个区间的缺失率
+    gp['miss_rate'] = np.round(gp['cnt'] / gp['total'], 3)
     return gp
+
+
+def acummvar(df: pd.DataFrame, x: str, y: str, group_cols=[], feature_grid=[],
+             cut_type=1, n_bin=10) -> pd.DataFrame:
+    """
+    变量累计分布 对x 进行分组，然后累计计算每组y的均值和数量
+    :param x df 中的字段名称
+    :param group_cols 维度；先进行分组，然后在根据维度分别进行统计
+    :param feature_grid cut_type n_bin 分组的参数 get_bin
+    """
+    # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
+    df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
+    if len(group_cols) > 0:
+        gp_all = df.groupby(group_cols).agg({y: ['count', 'mean']})
+        gp.columns = ['cnt', 'avg']
 
 
 def sample_label(df, label, classes=[]) -> pd.DataFrame:
@@ -193,55 +224,56 @@ def sample_label(df, label, classes=[]) -> pd.DataFrame:
     gp = pd.DataFrame([[df.shape[0], df[label].sum(), df[label].mean()]],
                       columns=['样本量', '正样本量', '正样本率'], index=['总计'])
     if classes:
-        tmp = df.groupby(classes).agg(样本量=(label, 'count'), 正样本量=(label, 'sum'), 正样本率=(label, 'mean')).reset_index()
+        tmp = df.groupby(classes).agg(样本量=(label, 'count'), 正样本量=(label, 'sum'),
+                                      正样本率=(label, 'mean')).reset_index()
         gp = pd.concat([tmp, gp], axis=0)
         gp['lift'] = np.round(gp['正样本率'] / gp.loc['总计', '正样本率'], 2)
     gp['正样本率'] = np.round(gp['正样本率'], 2)
     return gp
 
 
-def model_evaluate_classier(y_real, y_pred):
-    """
-    二分类模型评估指标
-    @param y_real : list，真实值
-    @param y_pred : list, 预测值
-    混淆矩阵：
-            真实值
-            1	0
-    预测值 1 TP  FP
-          0 FN  TN
-    准确率 Accuracy = (TP+TN) / (TP+FP+FN+TN)
-    精确率(Precision) = TP / (TP+FP) --- 预测为正样本 分母为预测正样本
-    召回率(Recall) = TP / (TP+FN) -- 实际为正样本 分母为真实正样本
-    F-Meauter = (a^2 + 1) * 精确率 * 召回率 / [a^2 * (精确率 + 召回率)]
-    a^2 如何定义
-    F1分数(F1-Score) = 2 *  精确率 * 召回率 / (精确率 + 召回率)
-    P-R曲线 ： 平衡点即为 F1分数；y-axis = 精确率；x-axis= 召回率
-    平衡点 ： 精确率 = 召回率
-    真正率(TPR) = TP / (TP+FN)-- 以真实样本 分母为真实正样本
-    假正率(FPR) = FP / (FP+TN)-- 以真实样本 分母为真实负样本
-    Roc 曲线：y-axis=真正率 ; x-axis=假正率； 无视样本不均衡问题
-    AUC = Roc 曲线面积
-    """
-    accuracy = accuracy_score(y_real, y_pred)
-    # p=precision_score(y_real, y_pred)
-    # f1=f1_score(y_real, y_pred)
-    # 返回confusion matrix
-    cm = confusion_matrix(y_real, y_pred)
-    # 返回 精确率，召回率，F1
-    cr = classification_report(y_real, y_pred)
-    auc = roc_auc_score(y_real, y_pred)
+#
+# def model_evaluate_classier(y_real, y_pred):
+#     """
+#     二分类模型评估指标
+#     @param y_real : list，真实值
+#     @param y_pred : list, 预测值
+#     混淆矩阵：
+#             真实值
+#             1	0
+#     预测值 1 TP  FP
+#           0 FN  TN
+#     准确率 Accuracy = (TP+TN) / (TP+FP+FN+TN)
+#     精确率(Precision) = TP / (TP+FP) --- 预测为正样本 分母为预测正样本
+#     召回率(Recall) = TP / (TP+FN) -- 实际为正样本 分母为真实正样本
+#     F-Meauter = (a^2 + 1) * 精确率 * 召回率 / [a^2 * (精确率 + 召回率)]
+#     a^2 如何定义
+#     F1分数(F1-Score) = 2 *  精确率 * 召回率 / (精确率 + 召回率)
+#     P-R曲线 ： 平衡点即为 F1分数；y-axis = 精确率；x-axis= 召回率
+#     平衡点 ： 精确率 = 召回率
+#     真正率(TPR) = TP / (TP+FN)-- 以真实样本 分母为真实正样本
+#     假正率(FPR) = FP / (FP+TN)-- 以真实样本 分母为真实负样本
+#     Roc 曲线：y-axis=真正率 ; x-axis=假正率； 无视样本不均衡问题
+#     AUC = Roc 曲线面积
+#     """
+#     accuracy = accuracy_score(y_real, y_pred)
+#     # p=precision_score(y_real, y_pred)
+#     # f1=f1_score(y_real, y_pred)
+#     # 返回confusion matrix
+#     cm = confusion_matrix(y_real, y_pred)
+#     # 返回 精确率，召回率，F1
+#     cr = classification_report(y_real, y_pred)
+#     auc = roc_auc_score(y_real, y_pred)
 
 
-def psi(data_base, data_test, feature_grid=[], n_bin=10):
+def psi(data_base: Union[list, np.array, pd.Series],
+        data_test: Union[list, np.array, pd.Series], feature_grid=[], n_bin=10):
     """
-    支持数字型和非数字型；如果是非数字型，则按每一个取值分组
-    计算稳定性--
-    data_base: list, 1d - np.array, pd.Series；默认剔除空值 空字符串
-    data_test:以df_base 为基准，进行分段
-    feature_grid:如果未指定，则按照等频 n_bin 分组
-    psi:
-    > 0.25  分布差异明显
+    支持数值型&类别型，计算的时候，剔除空值
+    :param data_base: 基准值
+    :param data_test: 观察值
+    :param feature_grid 分组参数 如果未指定，则按照等频 n_bin 分组
+    :return psi   >0.25  分布差异明显
     """
     if (data_base is None) or (data_test is None):
         raise ValueError('data error')
@@ -260,7 +292,7 @@ def psi(data_base, data_test, feature_grid=[], n_bin=10):
     else:
         # 对 data_base 进行分组
         if feature_grid:
-            feature_grid = get_feature_grid(data_base, qcut_type=1, n_bin=n_bin)
+            feature_grid = get_feature_grid(data_base, cut_type=1, n_bin=n_bin)
         data_base = get_bin(data_base, 'data', feature_grid=feature_grid)
         data_test = get_bin(data_test, 'data', feature_grid=feature_grid)
     # 统计每个区间的分布
@@ -275,27 +307,11 @@ def psi(data_base, data_test, feature_grid=[], n_bin=10):
     gp['psi'] = (gp.base_rate - gp.test_rate) * np.log((gp.base_rate + eps) / (gp.test_rate + eps))
     return np.round(gp['psi'].sum(), 2)
 
-
-def eval_miss(df, feature_name, label):
-    """
-    不同 label 的情况下，feature_name 的缺失率
-    如果随着时间的偏移，不一致，缺失的采取了其他的策略-> 其他的字段分布明显的差异
-    """
-    # 分组统计
-    gp = df.groupby(label)[feature_name].count().reset_index()
-    tmp = df.groupby(label).size().reset_index().rename(columns={0: 'total'})
-    gp = gp.merge(tmp, on='label', how='right')
-    gp['miss_rate'] = np.round(gp[feature_name] / gp['total'], 3)
-    return gp
-
-
-def woe(df,x,y,n_bins=10):
-    """
-    woe 计算
-    x:list or str
-    """
-    if isinstance(x,str):
-        x=[x]
-    ce.WOEEncoder(df[x])
-
-
+# def woe(df, x, y, n_bins=10):
+#     """
+#     woe 计算
+#     x:list or str
+#     """
+#     if isinstance(x, str):
+#         x = [x]
+#     ce.WOEEncoder(df[x])

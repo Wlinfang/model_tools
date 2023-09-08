@@ -7,6 +7,7 @@ import base64
 
 import numpy as np
 import pandas as pd
+from typing import Union
 import logging
 
 # 科学计数法全部显示
@@ -89,11 +90,9 @@ def parse_week(df: pd.DataFrame, date_name: str, date_name_new: str):
     return df
 
 
-def del_none(values) -> np.array:
+def del_none(values: Union[list, np.array, pd.Series]) -> np.array:
     """
     删除空值
-    values：list, np.array
-    return:如果 values = None 返回 None
     """
     if values is None:
         return values
@@ -104,12 +103,11 @@ def del_none(values) -> np.array:
     vt = values.dtype.kind
     if vt not in ['i', 'u', 'f', 'c']:
         values = values[values != '']
+        values = values.astype(float)
     # 剔除 np.nan-- 必须是数字类型,如果不是，则不进行剔除
     try:
-        if vt not in ['i', 'u', 'f', 'c']:
-            values = values.astype(float)
         values = values[~np.isnan(values)]
     except ValueError as e:
         # 非数字类型，不进行剔除
-        logger.info('%s values is %s', (e, values))
+        logger.info('%s is %s', (values,e))
     return values
