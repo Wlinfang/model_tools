@@ -103,6 +103,7 @@ def get_bin(df: pd.DataFrame, feature_name: str, cut_type=1,
     t1['lbl_left'] = t1.lbl_index.apply(lambda x: cats[x])
     # 更新空值，空值为最大
     t1.loc[t1.lbl_index == -1, 'lbl_index'] = t1.lbl_index.max() + 1
+    t1['lbl_left'] = t1['lbl_left'].astype(str)
     return t1
 
 
@@ -172,45 +173,44 @@ def describe_df(df, feature_names: list) -> pd.DataFrame:
     return df_num
 
 
-def univar(df: pd.DataFrame, x: str, y: str, group_cols=[], feature_grid=[],
+def univar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
            cut_type=1, n_bin=10) -> pd.DataFrame:
     """
     单变量分布：对 x 进行分组，求每组的y的均值
     :param x df 中的字段名称
-    :param group_cols 维度；先进行分组，然后在根据维度分别进行统计
     :param feature_grid cut_type n_bin 分组的参数 get_bin
     """
     # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
     # 对应的y mean 计算
-    if len(group_cols) > 0:
-        group_cols.extend(['lbl', 'lbl_index', 'lbl_left'])
-    else:
-        group_cols = ['lbl', 'lbl_index', 'lbl_left']
+    group_cols = ['lbl', 'lbl_index', 'lbl_left']
     # 分组计算 y 的数量
-    gp = df.groupby(group_cols).agg({y: ['count', 'mean']})
-    gp.columns = ['cnt', 'avg']
+    gp = df.groupby(group_cols).agg({y: ['count', 'sum']})
+    gp.columns = ['cnt', 'sum']
+    gp['avg'] = np.round(gp['sum'] / gp['cnt'], 3)
     gp.reset_index(inplace=True)
-    tmp = df.groupby(group_cols).size().reset_index().rename(columns={0: "total"})
-    gp = tmp.merge(gp, on=group_cols, how='left')
-    # y 值在这个区间的缺失率
-    gp['miss_rate'] = np.round(gp['cnt'] / gp['total'], 3)
     return gp
 
 
-def acummvar(df: pd.DataFrame, x: str, y: str, group_cols=[], feature_grid=[],
+def accumvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
              cut_type=1, n_bin=10) -> pd.DataFrame:
     """
     变量累计分布 对x 进行分组，然后累计计算每组y的均值和数量
     :param x df 中的字段名称
-    :param group_cols 维度；先进行分组，然后在根据维度分别进行统计
     :param feature_grid cut_type n_bin 分组的参数 get_bin
     """
     # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
-    if len(group_cols) > 0:
-        gp_all = df.groupby(group_cols).agg({y: ['count', 'mean']})
-        gp.columns = ['cnt', 'avg']
+    group_cols = ['lbl_index', 'lbl', 'lbl_left']
+    gp = pd.pivot_table(df, values=y, index=group_cols,
+                        sort='lbl_index', aggfunc=['count', 'sum'],
+                        fill_value=0, margins=True, observed=True)
+    gp.columns = ['cnt', 'sum']
+    gp['avg'] = np.round(gp['sum'] / gp['cnt'], 3)
+    gp['accum_cnt'] = gp['cnt'].cumsum()
+    gp['accum_sum'] = gp['sum'].cumsum()
+    gp['accum_avg'] = np.round(gp['accum_sum'] / gp['accum_cnt'], 3)
+    return gp
 
 
 def sample_label(df, label, classes=[]) -> pd.DataFrame:
