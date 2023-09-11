@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 from typing import Union
+from sklearn import metrics
+import plotly.graph_objects as go
 
 from model_tools.utils.toolutil import del_none
 
@@ -245,38 +247,62 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     return gp
 
 
-#
-# def model_evaluate_classier(y_real, y_pred):
-#     """
-#     二分类模型评估指标
-#     @param y_real : list，真实值
-#     @param y_pred : list, 预测值
-#     混淆矩阵：
-#             真实值
-#             1	0
-#     预测值 1 TP  FP
-#           0 FN  TN
-#     准确率 Accuracy = (TP+TN) / (TP+FP+FN+TN)
-#     精确率(Precision) = TP / (TP+FP) --- 预测为正样本 分母为预测正样本
-#     召回率(Recall) = TP / (TP+FN) -- 实际为正样本 分母为真实正样本
-#     F-Meauter = (a^2 + 1) * 精确率 * 召回率 / [a^2 * (精确率 + 召回率)]
-#     a^2 如何定义
-#     F1分数(F1-Score) = 2 *  精确率 * 召回率 / (精确率 + 召回率)
-#     P-R曲线 ： 平衡点即为 F1分数；y-axis = 精确率；x-axis= 召回率
-#     平衡点 ： 精确率 = 召回率
-#     真正率(TPR) = TP / (TP+FN)-- 以真实样本 分母为真实正样本
-#     假正率(FPR) = FP / (FP+TN)-- 以真实样本 分母为真实负样本
-#     Roc 曲线：y-axis=真正率 ; x-axis=假正率； 无视样本不均衡问题
-#     AUC = Roc 曲线面积
-#     """
-#     accuracy = accuracy_score(y_real, y_pred)
-#     # p=precision_score(y_real, y_pred)
-#     # f1=f1_score(y_real, y_pred)
-#     # 返回confusion matrix
-#     cm = confusion_matrix(y_real, y_pred)
-#     # 返回 精确率，召回率，F1
-#     cr = classification_report(y_real, y_pred)
-#     auc = roc_auc_score(y_real, y_pred)
+def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array], y_pred: Union[list, pd.Series, np.array]):
+    """ 二分类模型评估指标
+    ...
+    混淆矩阵
+    -------
+                      真实值
+                1                 0
+    预测值  1    TP               FP
+           0    FN               TN
+    | 准确率 Accuracy = (TP+TN) / (TP+FP+FN+TN)
+    | 精确率(Precision) = TP / (TP+FP) --- 预测为正样本 分母为预测正样本
+    | 召回率(Recall) = TP / (TP+FN) -- 实际为正样本 分母为真实正样本
+    | F1分数(F1-Score) = 2 *  精确率 * 召回率 / (精确率 + 召回率)
+    | P-R曲线 ： y-axis = 精确率；x-axis= 召回率  平衡点 ： 精确率 = 召回率
+    | 真正率(TPR) = TP / (TP+FN)-- 以真实样本 分母为真实正样本
+    | 假正率(FPR) = FP / (FP+TN)-- 以真实样本 分母为真实负样本
+    | Roc 曲线：y-axis=真正率 ; x-axis=假正率； 无视样本不均衡问题
+    """
+    # 返回 精确率，召回率，F1
+    fpr, tpr, thr = metrics.roc_curve(y_true, y_pred)
+    auc = np.round(metrics.roc_auc_score(y_true, y_pred),3)
+    # ks 曲线
+    ks = np.round(abs(tpr - fpr),3)
+    # 标注最大值
+    ks_max_index = ks.argmax()
+    ks_max_y = ks[ks_max_index]
+    ks_max_x = ks[ks_max_index]
+    # roc 图，ks 图
+    # x=fpr;;; y = tpr  ks
+    gini = 2 * auc - 1
+    data = [
+        # roc-auc 图
+        go.Scatter(x=fpr, y=tpr, mode='lines', name='roc-auc'),
+        # ks 图
+        go.Scatter(x=fpr, y=ks, mode='lines', name='ks'),
+        # ks 最大值
+        go.Scatter(x=[ks_max_x], y=[ks_max_y], name='ks-max')
+    ]
+    fig = go.Figure(data)
+    fig.add_annotation(dict(font=dict(color='rgba(0,0,200,0.8)', size=12),
+                            x=ks_max_x,
+                            y=ks_max_y + 0.02,
+                            showarrow=False,
+                            text='ks = ' + str(ks_max_y) + '  ',
+                            textangle=0,
+                            xanchor='auto',
+                            xref="x",
+                            yref="y"))
+
+    title = 'count:{} rate_bad:{} auc:{} ks:{} gini:{}'.format(
+        len(y_true), np.round(np.mean(y_true), 3),
+        auc, ks_max_y, gini
+    )
+    # uniformtext_minsize 调整标注文字大小；uniformtext_mode 不合规数字隐藏
+    fig.update_layout(title=title, uniformtext_minsize=2, uniformtext_mode='hide')
+    fig.show()
 
 
 def psi(data_base: Union[list, np.array, pd.Series],
