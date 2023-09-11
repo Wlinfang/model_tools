@@ -174,16 +174,20 @@ def describe_df(df, feature_names: list) -> pd.DataFrame:
 
 
 def univar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
-           cut_type=1, n_bin=10) -> pd.DataFrame:
+           cut_type=1, n_bin=10, group_cols=[]) -> pd.DataFrame:
     """
     单变量分布：对 x 进行分组，求每组的y的均值
     :param x df 中的字段名称
     :param feature_grid cut_type n_bin
+    :param group_cols 分组统计
     """
     # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
     # 对应的y mean 计算
-    group_cols = ['lbl', 'lbl_index', 'lbl_left']
+    if len(group_cols) == 0:
+        group_cols = ['lbl', 'lbl_index', 'lbl_left']
+    else:
+        group_cols.extend(['lbl', 'lbl_index', 'lbl_left'])
     gp = pd.pivot_table(df, values=y, index=group_cols,
                         sort='lbl_index', aggfunc=['count', 'sum'],
                         fill_value=0, margins=False, observed=True)
@@ -195,59 +199,96 @@ def univar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
 
 
 def accumvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
-             cut_type=1, n_bin=10) -> pd.DataFrame:
+             cut_type=1, n_bin=10, group_cols=[]) -> pd.DataFrame:
     """
     变量累计分布 对x 进行分组，然后累计计算每组y的均值和数量
     :param x df 中的字段名称
     :param feature_grid cut_type n_bin
+    :param group_cols 分组统计
     """
     # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
-    group_cols = ['lbl_index', 'lbl', 'lbl_left']
-    gp = pd.pivot_table(df, values=y, index=group_cols,
+    cls_cols = group_cols
+    if len(group_cols) == 0:
+        cls_cols = ['lbl_index', 'lbl', 'lbl_left']
+    else:
+        # 如果是 cls_cols.extend，则会更新 group_cols
+        cls_cols = cls_cols + ['lbl_index', 'lbl', 'lbl_left']
+    gp = pd.pivot_table(df, values=y, index=cls_cols,
                         sort='lbl_index', aggfunc=['count', 'sum'],
                         fill_value=0, margins=False, observed=True)
     gp.columns = ['cnt', 'sum']
     gp['avg'] = np.round(gp['sum'] / gp['cnt'], 3)
-    gp['accum_cnt'] = gp['cnt'].cumsum()
-    gp['accum_sum'] = gp['sum'].cumsum()
-    gp['accum_avg'] = np.round(gp['accum_sum'] / gp['accum_cnt'], 3)
+    print(group_cols)
+    if len(group_cols) == 0:
+        gp['accum_cnt'] = gp['cnt'].cumsum()
+        gp['accum_sum'] = gp['sum'].cumsum()
+        gp['accum_avg'] = np.round(gp['accum_sum'] / gp['accum_cnt'], 3)
+    else:
+        gp['accum_cnt'] = gp.groupby(group_cols)['cnt'].cumsum()
+        gp['accum_sum'] = gp.groupby(group_cols)['sum'].cumsum()
+        gp['accum_avg'] = np.round(gp['accum_sum'] / gp['accum_cnt'], 3)
     return gp
 
 
 def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
-            cut_type=1, n_bin=10) -> pd.DataFrame:
+            cut_type=1, n_bin=10, group_cols=[]) -> pd.DataFrame:
     """
     变量lift 分布，适用于y值二分类,对 x 变量进行分组
     :param y  定义 坏=1   好=0
+    :param group_cols 分组统计
     :param feature_grid cut_type[1:等频分布 2:等宽分布] n_bin 分组的参数
     """
     # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
-    group_cols = ['lbl', 'lbl_index', 'lbl_left']
+    cls_cols = group_cols
+    if len(group_cols) == 0:
+        cls_cols = ['lbl', 'lbl_index', 'lbl_left']
+    else:
+        # extend : 会 更新 group_cols的数据
+        cls_cols = cls_cols + ['lbl', 'lbl_index', 'lbl_left']
     # 分组对y 进行计算
-    gp = pd.pivot_table(df, values=y, index=group_cols,
+    gp = pd.pivot_table(df, values=y, index=cls_cols,
                         sort='lbl_index', aggfunc=['count', 'sum'],
                         fill_value=0, margins=True, observed=True)
     gp.columns = ['cnt', 'cnt_bad']
     gp['cnt_good'] = gp['cnt'] - gp['cnt_bad']
     gp['rate_bad'] = np.round(gp['cnt_bad'] / gp['cnt'], 3)
-    # 累计
-    gp['accum_cnt_bad'] = gp['cnt_bad'].cumsum()
-    gp['accum_cnt_good'] = gp['cnt_good'].cumsum()
-    gp.loc['All', 'accum_cnt_bad'] = None
-    gp.loc['All', 'accum_cnt_good'] = None
-    # 坏样本占整体坏样本比例
-    gp['accum_rate_bad_over_allbad'] = np.round(gp['accum_cnt_bad'] / gp.loc['All', 'cnt_bad'].values[0], 3)
-    # 好样本占整体好样本比例
-    gp['accum_rate_good_over_allgood'] = np.round(gp['accum_cnt_good'] / gp.loc['All', 'cnt_good'].values[0], 3)
-    # lift = bad_over_allbad_rate / bad_rate
-    gp['accum_lift_bad'] = np.round(gp['accum_rate_bad_over_allbad'] / gp.loc['All', 'rate_bad'].values[0], 3)
     gp.reset_index(inplace=True)
+    if len(group_cols) == 0:
+        # 累计
+        gp['accum_cnt_bad'] = gp['cnt_bad'].cumsum()
+        gp['accum_cnt_good'] = gp['cnt_good'].cumsum()
+        gp.loc['All', 'accum_cnt_bad'] = None
+        gp.loc['All', 'accum_cnt_good'] = None
+        # 坏样本占整体坏样本比例
+        gp['accum_rate_bad_over_allbad'] = np.round(gp['accum_cnt_bad'] / gp.loc['All', 'cnt_bad'].values[0], 3)
+        # 好样本占整体好样本比例
+        gp['accum_rate_good_over_allgood'] = np.round(gp['accum_cnt_good'] / gp.loc['All', 'cnt_good'].values[0], 3)
+        # lift = bad_over_allbad_rate / bad_rate
+        gp['accum_lift_bad'] = np.round(gp['accum_rate_bad_over_allbad'] / gp.loc['All', 'rate_bad'].values[0], 3)
+    else:
+        gp['accum_cnt_bad'] = gp.groupby(group_cols)['cnt_bad'].cumsum()
+        gp['accum_cnt_good'] = gp.groupby(group_cols)['cnt_good'].cumsum()
+        tmp = gp.groupby(group_cols).agg(all_cnt_bad=('cnt_bad', 'sum'),
+                                         all_cnt_good=('cnt_good', 'sum')).reset_index()
+        tmp['all_rate_bad'] = np.round(tmp['all_cnt_bad'] / (tmp['all_cnt_bad'] + tmp['all_cnt_good']), 3)
+        gp = gp.merge(tmp, on=group_cols, how='left')
+
+        # 坏样本占整体坏样本比例
+        gp['accum_rate_bad_over_allbad'] = np.round(gp['accum_cnt_bad'] / gp['all_cnt_bad'], 3)
+        # 好样本占整体好样本比例
+        gp['accum_rate_good_over_allgood'] = np.round(gp['accum_cnt_good'] / gp['all_cnt_good'], 3)
+        # lift = bad_over_allbad_rate / bad_rate
+        gp['accum_lift_bad'] = np.round(gp['accum_rate_bad_over_allbad'] / gp['all_rate_bad'], 3)
+        # 删除
+        gp.drop(['all_cnt_bad', 'all_cnt_good', 'all_rate_bad'], axis=1, inplace=True)
     return gp
 
 
-def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array], y_pred: Union[list, pd.Series, np.array]):
+def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
+                             y_pred: Union[list, pd.Series, np.array],
+                             is_show=True):
     """ 二分类模型评估指标
     ...
     混淆矩阵
@@ -267,9 +308,9 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array], y_pred: U
     """
     # 返回 精确率，召回率，F1
     fpr, tpr, thr = metrics.roc_curve(y_true, y_pred)
-    auc = np.round(metrics.roc_auc_score(y_true, y_pred),3)
+    auc = np.round(metrics.roc_auc_score(y_true, y_pred), 3)
     # ks 曲线
-    ks = np.round(abs(tpr - fpr),3)
+    ks = np.round(abs(tpr - fpr), 3)
     # 标注最大值
     ks_max_index = ks.argmax()
     ks_max_y = ks[ks_max_index]
@@ -277,32 +318,34 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array], y_pred: U
     # roc 图，ks 图
     # x=fpr;;; y = tpr  ks
     gini = 2 * auc - 1
-    data = [
-        # roc-auc 图
-        go.Scatter(x=fpr, y=tpr, mode='lines', name='roc-auc'),
-        # ks 图
-        go.Scatter(x=fpr, y=ks, mode='lines', name='ks'),
-        # ks 最大值
-        go.Scatter(x=[ks_max_x], y=[ks_max_y], name='ks-max')
-    ]
-    fig = go.Figure(data)
-    fig.add_annotation(dict(font=dict(color='rgba(0,0,200,0.8)', size=12),
-                            x=ks_max_x,
-                            y=ks_max_y + 0.02,
-                            showarrow=False,
-                            text='ks = ' + str(ks_max_y) + '  ',
-                            textangle=0,
-                            xanchor='auto',
-                            xref="x",
-                            yref="y"))
+    if is_show:
+        data = [
+            # roc-auc 图
+            go.Scatter(x=fpr, y=tpr, mode='lines', name='roc-auc'),
+            # ks 图
+            go.Scatter(x=fpr, y=ks, mode='lines', name='ks'),
+            # ks 最大值
+            go.Scatter(x=[ks_max_x], y=[ks_max_y], name='ks-max')
+        ]
+        fig = go.Figure(data)
+        fig.add_annotation(dict(font=dict(color='rgba(0,0,200,0.8)', size=12),
+                                x=ks_max_x,
+                                y=ks_max_y + 0.02,
+                                showarrow=False,
+                                text='ks = ' + str(ks_max_y) + '  ',
+                                textangle=0,
+                                xanchor='auto',
+                                xref="x",
+                                yref="y"))
 
-    title = 'count:{} rate_bad:{} auc:{} ks:{} gini:{}'.format(
-        len(y_true), np.round(np.mean(y_true), 3),
-        auc, ks_max_y, gini
-    )
-    # uniformtext_minsize 调整标注文字大小；uniformtext_mode 不合规数字隐藏
-    fig.update_layout(title=title, uniformtext_minsize=2, uniformtext_mode='hide')
-    fig.show()
+        title = 'count:{} rate_bad:{} auc:{} ks:{} gini:{}'.format(
+            len(y_true), np.round(np.mean(y_true), 3),
+            auc, ks_max_y, gini
+        )
+        # uniformtext_minsize 调整标注文字大小；uniformtext_mode 不合规数字隐藏
+        fig.update_layout(title=title, uniformtext_minsize=2, uniformtext_mode='hide')
+        fig.show()
+    return auc, ks, gini
 
 
 def psi(data_base: Union[list, np.array, pd.Series],
