@@ -2,12 +2,15 @@ import os
 
 import numpy as np
 import pandas as pd
+from typing import List, Union
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
-def plot_univar(df: pd.DataFrame, x: str, y: str, title='', is_show=False) -> go.Figure:
+def plot_univar(df: pd.DataFrame, x: str, y: str, title='',
+                group_cols='',
+                is_show=False) -> go.Figure:
     """
     单变量 折线图
     :param df:
@@ -21,6 +24,7 @@ def plot_univar(df: pd.DataFrame, x: str, y: str, title='', is_show=False) -> go
     data = [
         go.Scatter(x=df[x], y=df[y], name=y)
     ]
+
     layout = go.Layout(
         title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
         legend=dict(yanchor="top", y=1.2, xanchor="right", x=1),
@@ -28,18 +32,21 @@ def plot_univar(df: pd.DataFrame, x: str, y: str, title='', is_show=False) -> go
         yaxis=dict(title=y, zeroline=True, ),
     )
     fig = go.Figure(data=data, layout=layout)
+    fig.update_layout()
     if is_show:
         fig.show()
     return fig
 
 
-
-def plot_univar_with_bar(df: pd.DataFrame, x: str, y_rate: str, y_cnt: str, title='',
+def plot_univar_with_bar(df: pd.DataFrame, x: str, y_rate: str, y_cnt: str,
+                         group_col='',
+                         title='',
                          is_show=False) -> go.Figure:
     """
     单变量分布图:柱形图+折线图的联合分布
     :param y_rate  折线图
     :param y_cnt 柱形图
+    :param group_col 分组
     :param title:图片名字
     """
     df[x] = df[x].astype(str)
@@ -48,6 +55,9 @@ def plot_univar_with_bar(df: pd.DataFrame, x: str, y_rate: str, y_cnt: str, titl
         go.Scatter(x=df[x], y=df[y_rate], name=y_rate, yaxis='y2')
     ]
     layout = go.Layout(
+        barmode='group',
+        bargap=0.4,  # 组间距离
+        bargroupgap=0.2,  # 组内距离
         title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
         legend=dict(yanchor="top", y=1.2, xanchor="right", x=1),
         xaxis=dict(title=x, tickangle=-45),
@@ -57,6 +67,44 @@ def plot_univar_with_bar(df: pd.DataFrame, x: str, y_rate: str, y_cnt: str, titl
                     zeroline=True, )
     )
     fig = go.Figure(data=data, layout=layout)
+    if is_show:
+        fig.show()
+    return fig
+
+
+def plot_univar_with_pdp(df, x, y1_cnt, y1_rate, y2, title='', is_show=False) -> go.Figure:
+    """
+    单变量分布图  变量x 同 y_true 的关系  变量 x 同 y_pred 的关系
+    :param df:
+    :param x:
+    :param y1_cnt:
+    :param y1_rate:
+    :param y2:
+    :return:
+    """
+    # 2 行 1 列
+    fig = make_subplots(rows=2, cols=1, subplot_titles=('univar', 'php'))
+    data = [
+        go.Bar(x=df[x], y=df[y1_cnt], name=y1_cnt),
+        go.Scatter(x=df[x], y=df[y1_rate], name=y1_rate, yaxis='y2')
+    ]
+    fig.add_trace(
+        data=data,
+        row=1, col=1
+    )
+    fig.add_trace(
+        go.Scatter(x=df[x], y=df[y2], name=y2, mode='lines+markers'),
+        row=2, col=1
+    )
+    fig.update_layout(
+        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
+        legend=dict(yanchor="top", y=1.2, xanchor="right", x=1),
+        xaxis=dict(tickangle=-45),
+        yaxis2=dict(title=y1_rate, anchor='x', overlaying='y', side='right', zeroline=True),
+        # 第二个子图的横坐标轴
+        xaxis2=dict(tickangle=-45),
+        yaxis3=dict(title=y2, zeroline=True),
+    )
     if is_show:
         fig.show()
     return fig
@@ -81,6 +129,44 @@ def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
         go.Scatter(x=df[x2], y=df[y2], name=f2_title, mode='lines+markers'),
         row=1, col=2
     )
+    fig.update_layout(
+        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
+        legend=dict(yanchor="top", y=1.2, xanchor="right", x=1),
+        xaxis=dict(tickangle=-45),
+        # 第二个子图的横坐标轴
+        xaxis2=dict(tickangle=-45),
+    )
+    if is_show:
+        fig.show()
+    return fig
+
+
+def plot_liftvars(xs1: List[Union[list, pd.Series, np.array]],
+                  ys1: List[Union[list, pd.Series, np.array]],
+                  xs2: List[Union[list, pd.Series, np.array]],
+                  ys2: List[Union[list, pd.Series, np.array]],
+                  title,
+                  fig_titles, is_show=False
+                  ):
+    """
+    适用于多个数据集的情况，比如 训练集、测试集、验证集;2个子图
+    n = len(xs1) = len(xs2) = len(ys1) = len(ys2) 表示有 n 个数据集
+    :param (xs1[0],ys1[0]) (xs2[0],ys2[0]) 相当于 plot_liftvar 一个数据集的lift 图
+    :param fig_titles : 每个数据集的title len(fig_titles) = n
+    :return:
+    """
+    # 一行 两列
+    fig = make_subplots(rows=1, cols=2, subplot_titles=('', ''))
+    for x1, y1, x2, y2, f_title in zip(xs1, ys1, xs2, ys2, fig_titles):
+        # traces
+        fig.add_trace(
+            go.Scatter(x=x1, y=y1, name=f_title, mode='lines+markers'),
+            row=1, col=1
+        )
+        fig.add_trace(
+            go.Scatter(x=x2, y=y2, name=f_title, mode='lines+markers'),
+            row=1, col=1
+        )
     fig.update_layout(
         title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
         legend=dict(yanchor="top", y=1.2, xanchor="right", x=1),
