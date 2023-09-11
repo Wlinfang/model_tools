@@ -4,29 +4,90 @@ import numpy as np
 import pandas as pd
 
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 
-def plot_univar(df: pd.DataFrame, x: str, y_rate: str, y_cnt: str, title='',
-                x_title='', y_rate_title='', y_cnt_title='', is_show=True):
+def plot_univar(df: pd.DataFrame, x: str, y: str, title='', is_show=False) -> go.Figure:
     """
-    单变量分布图:样本量+每组的比例
+    单变量 折线图
+    :param df:
+    :param x:
+    :param y:
     :param title:
-    :param 如果 x_title y_rate_title y_cnt_title 为空，则默认使用x,y_rate,y_cnt
+    :param is_show:
+    :return:
     """
     df[x] = df[x].astype(str)
     data = [
-        go.Bar(x=df[x], y=df[y_cnt], name=y_cnt_title or y_cnt),
-        go.Scatter(x=df[x], y=df[y_rate], name=y_rate_title or y_rate, yaxis='y2')
+        go.Scatter(x=df[x], y=df[y], name=y)
     ]
     layout = go.Layout(
         title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
-        xaxis=dict(title=x_title or x, tickangle=-45),
-        yaxis=dict(title=y_cnt_title or y_cnt, zeroline=True, ),
-        yaxis2=dict(title=y_rate_title or y_rate,
+        legend=dict(yanchor="top", y=1.2, xanchor="right", x=1),
+        xaxis=dict(title=x, tickangle=-45),
+        yaxis=dict(title=y, zeroline=True, ),
+    )
+    fig = go.Figure(data=data, layout=layout)
+    if is_show:
+        fig.show()
+    return fig
+
+
+
+def plot_univar_with_bar(df: pd.DataFrame, x: str, y_rate: str, y_cnt: str, title='',
+                         is_show=False) -> go.Figure:
+    """
+    单变量分布图:柱形图+折线图的联合分布
+    :param y_rate  折线图
+    :param y_cnt 柱形图
+    :param title:图片名字
+    """
+    df[x] = df[x].astype(str)
+    data = [
+        go.Bar(x=df[x], y=df[y_cnt], name=y_cnt),
+        go.Scatter(x=df[x], y=df[y_rate], name=y_rate, yaxis='y2')
+    ]
+    layout = go.Layout(
+        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
+        legend=dict(yanchor="top", y=1.2, xanchor="right", x=1),
+        xaxis=dict(title=x, tickangle=-45),
+        yaxis=dict(title=y_cnt, zeroline=True, ),
+        yaxis2=dict(title=y_rate,
                     anchor='x', overlaying='y', side='right',
                     zeroline=True, )
     )
     fig = go.Figure(data=data, layout=layout)
+    if is_show:
+        fig.show()
+    return fig
+
+
+def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
+                 title='', f1_title='', f2_title='', is_show=True) -> go.Figure:
+    """
+    适用于(x1,y1) (x2,y2) 一行2个子图的情况，2个子图均为折线图
+    :param title 整个图的名称； f1_title 第一个子图的名称；f2_title 第二个子图的名称
+    :return:fig
+    """
+    # 一行 两列
+    fig = make_subplots(rows=1, cols=2, subplot_titles=('', ''))
+    # traces
+    fig.add_trace(
+        go.Scatter(x=df[x1], y=df[y1], name=f1_title, mode='lines+markers'),
+        row=1, col=1
+    )
+
+    fig.add_trace(
+        go.Scatter(x=df[x2], y=df[y2], name=f2_title, mode='lines+markers'),
+        row=1, col=2
+    )
+    fig.update_layout(
+        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
+        legend=dict(yanchor="top", y=1.2, xanchor="right", x=1),
+        xaxis=dict(tickangle=-45),
+        # 第二个子图的横坐标轴
+        xaxis2=dict(tickangle=-45),
+    )
     if is_show:
         fig.show()
     return fig
