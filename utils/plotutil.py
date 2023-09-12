@@ -6,67 +6,101 @@ from typing import List, Union
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import plotly.express as px
 
 
-def plot_univar(df: pd.DataFrame, x: str, y: str, title='',
-                group_cols='',
-                is_show=False) -> go.Figure:
+def plot_bar(df: pd.DataFrame, x: str, y: str,
+             title='', group_col=None, is_show=False) -> go.Figure:
     """
-    单变量 折线图
+    单变量 柱形图
     :param df:
     :param x:
     :param y:
     :param title:
+    :param group_col:
     :param is_show:
     :return:
     """
     df[x] = df[x].astype(str)
-    data = [
-        go.Scatter(x=df[x], y=df[y], name=y)
-    ]
-
-    layout = go.Layout(
-        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
-        legend=dict(yanchor="top", y=1.2, xanchor="right", x=1),
-        xaxis=dict(title=x, tickangle=-45),
-        yaxis=dict(title=y, zeroline=True, ),
+    if pd.isna(group_col) or len(group_col) == 0:
+        fig = px.bar(df, x=x, y=y, barmode='group')
+    else:
+        fig = px.bar(df, x=x, y=y, color=group_col, barmode='group')
+    fig.update_layout(
+        title=dict(text=title, y=0.95, x=0.5, xanchor='center', yanchor='top'),
+        barmode='group',
+        bargap=0.8,  # 组间距离
+        bargroupgap=0.2,  # 组内距离
+        width=900,
+        height=900*0.618
     )
-    fig = go.Figure(data=data, layout=layout)
-    fig.update_layout()
     if is_show:
         fig.show()
     return fig
 
 
-def plot_univar_with_bar(df: pd.DataFrame, x: str, y_rate: str, y_cnt: str,
-                         group_col='',
-                         title='',
-                         is_show=False) -> go.Figure:
+def plot_univar(df: pd.DataFrame, x: str, y: str,
+                title='', group_col=None, is_show=False) -> go.Figure:
+    """
+    单变量 折线图
+    :param df:
+    :param x:
+    :param y:
+    :param group_cols 分组 column of df
+    :param title:
+    :param is_show:
+    :return:
+    """
+    df[x] = df[x].astype(str)
+    if pd.isna(group_col) or len(group_col) == 0:
+        data = [
+            go.Scatter(x=df[x], y=df[y], name=y)
+        ]
+        legend = dict(yanchor="top", y=1, xanchor="right", x=1.3)
+    else:
+        data = []
+        for gc in df[group_col].unique():
+            data.append(
+                go.Scatter(x=df[df[group_col] == gc][x], y=df[df[group_col] == gc][y], name=gc)
+            )
+        # 横向图例
+        legend = dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h')
+
+    layout = go.Layout(
+        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
+        legend=legend,
+        xaxis=dict(title=x, tickangle=-45),
+        yaxis=dict(title=y, zeroline=True, ),
+        width=900,
+        height=900 * 0.618
+    )
+    fig = go.Figure(data=data, layout=layout)
+    if is_show:
+        fig.show()
+    return fig
+
+
+def plot_univar_with_bar(df: pd.DataFrame, x: str, y_line: str, y_bar: str,
+                         title='', is_show=False) -> go.Figure:
     """
     单变量分布图:柱形图+折线图的联合分布
-    :param y_rate  折线图
-    :param y_cnt 柱形图
-    :param group_col 分组
+    :param y_line  折线图
+    :param y_bar 柱形图
     :param title:图片名字
     """
     df[x] = df[x].astype(str)
-    data = [
-        go.Bar(x=df[x], y=df[y_cnt], name=y_cnt),
-        go.Scatter(x=df[x], y=df[y_rate], name=y_rate, yaxis='y2')
-    ]
+    t1 = go.Bar(x=df[x], y=df[y_bar], name=y_bar)
+    t2 = go.Scatter(x=df[x], y=df[y_line], xaxis='x', yaxis='y2', name=y_line)
     layout = go.Layout(
-        barmode='group',
-        bargap=0.4,  # 组间距离
-        bargroupgap=0.2,  # 组内距离
         title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
+        xaxis=dict(title=x, tickangle=-15),
+        yaxis=dict(title=y_bar, zeroline=True),
+        yaxis2=dict(title=y_line, anchor='x', overlaying='y', zeroline=True, side='right'),
         legend=dict(yanchor="top", y=1.2, xanchor="right", x=1),
-        xaxis=dict(title=x, tickangle=-45),
-        yaxis=dict(title=y_cnt, zeroline=True, ),
-        yaxis2=dict(title=y_rate,
-                    anchor='x', overlaying='y', side='right',
-                    zeroline=True, )
+        width=900,
+        height=900 * 0.618
     )
-    fig = go.Figure(data=data, layout=layout)
+    fig = go.Figure(data=[t1, t2], layout=layout)
     if is_show:
         fig.show()
     return fig
