@@ -89,7 +89,7 @@ def plot_univar_with_bar(df: pd.DataFrame, x: str, y_line: str, y_bar: str,
     :param title:图片名字
     """
     df[x] = df[x].astype(str)
-    t1 = go.Bar(x=df[x], y=df[y_bar], name=y_bar)
+    t1 = go.Bar(x=df[x], y=df[y_bar], name=y_bar,opacity=0.5)
     t2 = go.Scatter(x=df[x], y=df[y_line], xaxis='x', yaxis='y2', name=y_line)
     layout = go.Layout(
         title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
@@ -105,39 +105,56 @@ def plot_univar_with_bar(df: pd.DataFrame, x: str, y_line: str, y_bar: str,
         fig.show()
     return fig
 
-
-def plot_univar_with_pdp(df, x, y1_cnt, y1_rate, y2, title='', is_show=False) -> go.Figure:
+def plot_univar_and_pdp(df, x, y_true, y_pred, title='', group_col=None,is_show=False) -> go.Figure:
     """
     单变量分布图  变量x 同 y_true 的关系  变量 x 同 y_pred 的关系
     :param df:
     :param x:
-    :param y1_cnt:
-    :param y1_rate:
-    :param y2:
+    :param y_cnt:
+    :param y_true:
+    :param y_pred:
     :return:
     """
-    # 2 行 1 列
-    fig = make_subplots(rows=2, cols=1, subplot_titles=('univar', 'php'))
-    data = [
-        go.Bar(x=df[x], y=df[y1_cnt], name=y1_cnt),
-        go.Scatter(x=df[x], y=df[y1_rate], name=y1_rate, yaxis='y2')
-    ]
-    fig.add_trace(
-        data=data,
-        row=1, col=1
-    )
-    fig.add_trace(
-        go.Scatter(x=df[x], y=df[y2], name=y2, mode='lines+markers'),
-        row=2, col=1
+
+    fig = make_subplots(rows=2, cols=1, subplot_titles=('univar', 'pdp'))
+    if pd.isna(group_col) or len(group_col)==0:
+        fig.add_trace(
+            go.Scatter(x=df[x], y=df[y_true]),
+            row=1, col=1
+        )
+        # pdp
+        fig.add_trace(
+            go.Scatter(x=df[x], y=df[y_pred]),
+            row=2, col=1
+        )
+    else:
+        colors = px.colors.qualitative.Dark24
+        # 图例
+        labels = df[group_col].unique()
+        for ix in range(0, len(labels), 1):
+            gc = labels[ix]
+            color = colors[ix]
+            tmp=df[df[group_col] == gc]
+            # 单变量图
+            fig.add_trace(
+                go.Scatter(x=tmp[x], y=tmp[y_true],
+                           legendgroup='group', name=gc,
+                           hovertext=gc, line=dict(color=color)),
+                row=1, col=1
+            )
+            # pdp
+            fig.add_trace(
+                go.Scatter(x=tmp[x], y=tmp[y_pred], legendgroup='group',
+                           showlegend=False, hovertext=gc, line=dict(color=color)),
+                row=2, col=1
+            )
+    fig.update_yaxes(
+        matches=None
     )
     fig.update_layout(
         title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
-        legend=dict(yanchor="top", y=1.2, xanchor="right", x=1),
-        xaxis=dict(tickangle=-45),
-        yaxis2=dict(title=y1_rate, anchor='x', overlaying='y', side='right', zeroline=True),
-        # 第二个子图的横坐标轴
-        xaxis2=dict(tickangle=-45),
-        yaxis3=dict(title=y2, zeroline=True),
+        width=900,
+        height=900 * 0.618
     )
     if is_show:
         fig.show()
