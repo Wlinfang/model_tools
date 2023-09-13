@@ -290,7 +290,7 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
 
 def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
                              y_pred: Union[list, pd.Series, np.array],
-                             is_show=True):
+                             is_show=False):
     """ 二分类模型评估指标
     ...
     混淆矩阵
@@ -307,16 +307,21 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
     | 真正率(TPR) = TP / (TP+FN)-- 以真实样本 分母为真实正样本
     | 假正率(FPR) = FP / (FP+TN)-- 以真实样本 分母为真实负样本
     | Roc 曲线：y-axis=真正率 ; x-axis=假正率； 无视样本不均衡问题
+    :return cnt,auc,ks,gini
     """
+    if len(np.unique(y_true)) == 1:
+        # only one class
+        logger.info('only one class !!!')
+        return None, None, None,None
     # 返回 精确率，召回率，F1
     fpr, tpr, thr = metrics.roc_curve(y_true, y_pred)
     auc = np.round(metrics.roc_auc_score(y_true, y_pred), 3)
     # ks 曲线
-    ks = np.round(abs(tpr - fpr), 3)
+    ks_detail = np.round(abs(tpr - fpr), 3)
     # 标注最大值
-    ks_max_index = ks.argmax()
-    ks_max_y = ks[ks_max_index]
+    ks_max_index = ks_detail.argmax()
     ks_max_x = fpr[ks_max_index]
+    ks = ks_detail[ks_max_index]
     # roc 图，ks 图
     # x=fpr;;; y = tpr  ks
     gini = np.round(2 * auc - 1, 3)
@@ -327,14 +332,14 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
             # ks 图
             go.Scatter(x=fpr, y=ks, mode='lines', name='ks'),
             # ks 最大值
-            go.Scatter(x=[ks_max_x], y=[ks_max_y], name='ks-max')
+            go.Scatter(x=[ks_max_x], y=[ks], name='ks-max', size=20)
         ]
         fig = go.Figure(data)
         fig.add_annotation(dict(font=dict(color='rgba(0,0,200,0.8)', size=12),
                                 x=ks_max_x,
-                                y=ks_max_y + 0.02,
+                                y=ks,
                                 showarrow=False,
-                                text='ks = ' + str(ks_max_y) + '  ',
+                                text='ks = ' + str(ks) + '  ',
                                 textangle=0,
                                 xanchor='auto',
                                 xref="x",
@@ -342,12 +347,12 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
 
         title = 'count:{} rate_bad:{} auc:{} ks:{} gini:{}'.format(
             len(y_true), np.round(np.mean(y_true), 3),
-            auc, ks_max_y, gini
+            auc, ks, gini
         )
         # uniformtext_minsize 调整标注文字大小；uniformtext_mode 不合规数字隐藏
         fig.update_layout(title=title, uniformtext_minsize=2, uniformtext_mode='hide')
         fig.show()
-    return auc, ks, gini
+    return len(y_true),auc, ks, gini
 
 
 def psi(data_base: Union[list, np.array, pd.Series],

@@ -4,7 +4,7 @@
 import pandas as pd
 import numpy as np
 from typing import Union
-import mdlutil
+from model_tools.mymdl import mdlutil
 from model_tools.utils import plotutil
 
 
@@ -12,7 +12,6 @@ class ModelReport:
     def __int__(self, estimator, features: Union[list, np.array, pd.Series],
                 feature_dict: dict,
                 y: str,
-                df_train, df_val, df_test,
                 report_file):
         """
         :param estimator 学习器，必须有 predict_proba() 方法
@@ -26,16 +25,19 @@ class ModelReport:
         self.__features = features
         self.__feature_dict = feature_dict
         self.__label = y
-        self.__train = df_train.copy()
-        self.__val = None or df_val.copy()
-        self.__test = df_test.copy()
         self.__report_file = report_file
-        # 预测值
         self.__pred = 'y_pred'
-        self.__train[self.__pred] = self.__estimator.predict_proba(self.__train[features])[:, 1]
-        if self.__val is not None:
-            self.__val[self.__pred] = self.__estimator.predict_proba(self.__val[features])[:, 1]
-        self.__test[self.__pred] = self.__estimator.predict_proba(self.__test[features])[:, 1]
+
+    def __predict_proba(self, df):
+        """
+        预测值
+        :param df:
+        :return:
+        """
+        if df is None:
+            return None
+        df[self.__pred] = self.__estimator.predict_proba(df[self.__features])[:, 1]
+        return df
 
     def __stats_univar(self, df, feature_name, group_cols=[], n_bin=10, feature_grid=[]):
         """
@@ -97,56 +99,102 @@ class ModelReport:
         """
         统计数据集 df 的lift 表现
         :param df:
-        :param group_cols:
-        :param n_bin:
-        :param feature_grid:
-        :return:
+        :return: df_lift, df_auc
         """
         if df is None:
             return None, None, None
-        gp = mdlutil.liftvar(df, self.__pred, self.__label, feature_grid=feature_grid, group_cols=group_cols)
-        auc, ks, gini = mdlutil.evaluate_binary_classier(df[self.__label], df[self.__pred])
-        return gp, auc, ks
+        gp = mdlutil.liftvar(df, self.__pred, self.__label, feature_grid=feature_grid, cut_type=1, n_bin=n_bin,
+                             group_cols=group_cols)
+        gp = gp.reset_index()
+        # 分组计算 auc,ks,gini
+        if len(group_cols) > 0:
+            gp_auc = df.groupby(group_cols).apply(
+                lambda x: mdlutil.evaluate_binary_classier(x[self.__label], x[self.__pred], is_show=False))
+            gp_auc = gp_auc.reset_index().rename(columns={0: 'value'})
+            gp_auc.loc[:, ['cnt', 'auc', 'ks', 'gini']] = gp_auc['value'].apply(pd.Series,
+                                                                                index=['cnt', 'auc', 'ks', 'gini'])
+            gp_auc.drop(['value'], axis=1, inplace=True)
+            return gp, gp_auc
+        else:
+            auc, ks, gini = mdlutil.evaluate_binary_classier(df[self.__label], df[self.__pred])
+            gp_auc = pd.DataFrame([[len(df), auc, ks, gini]], columns=['cnt', 'auc', 'ks', 'gini'], index=['all'])
+        return gp, gp_auc
 
-    def report_liftchart(self, n_bin=10, plot_trte=True):
+    def report_liftchart(self, df_train, df_val, df_test, n_bin=10,
+                         group_cols=[],
+                         plot_trte=True,
+                         is_show=False, is_save=False) -> pd.DataFrame:
         """
-        输出模型分的lift 表现
-        :param n_bin:
-        :param plot_trte:True,输出训练集，测试集、验证集的表现  False : 只看 test 的表现
+        输出模型分的lift 表现;df_test 必须有值；
+        :param group_cols 分组查看
+        :param plot_trte:True,输出训练集，测试集、验证集[可选]的表现  False : 只看 test 的表现
         :return:
         """
+        if df_test is None:
+            raise ValueError('df_test is None！！！')
+            return None
+        if plot_trte and df_train is None:
+            raise ValueError('df_train is None！！！')
+            return None
         feature_grid = []
         if plot_trte:
-            feature_grid = mdlutil.get_feature_grid(self.__train[self.__pred], cut_type=1, n_bin=n_bin)
-        # train
-        gp_train, auc, ks = self.__stats_liftvar(self.__train, group_cols=None, n_bin=n_bin, feature_grid=feature_grid)
-        train_title = 'train:::cnt:{} auc:{} ks:{}'.format(len(self.__train), auc, ks)
-        gp_train['group_col'] = train_title
-        # val
-        val_title = ''
-        gp_val, auc, ks = self.__stats_liftvar(self.__val, group_cols=None, n_bin=n_bin, feature_grid=feature_grid)
-        if gp_val:
-            val_title = 'val:::cnt:{} auc:{} ks:{}'.format(len(self.__val),
-                                                           auc, ks)
-            gp_val['group_col'] = val_title
-        # test
-        gp_test, auc, ks = self.__stats_liftvar(self.__test, group_cols=None, n_bin=n_bin, feature_grid=feature_grid)
-        test_title = 'test:::cnt:{} auc:{} ks:{}'.format(len(self.__test),
-                                                         auc, ks)
-        gp_test['group_col'] = test_title
-
-        if gp_val:
-            gp = pd.concat([gp_train, gp_val, gp_test], ignore_index=True)
+            # 预测分值
+            df_train = self.__predict_proba(df_train)
+            feature_grid = mdlutil.get_feature_grid(df_train[self.__pred], cut_type=1, n_bin=n_bin)
+            # 验证集预测
+            if df_val is not None:
+                df_val = self.__predict_proba(df_val)
         else:
-            gp = pd.concat([gp_train, gp_test], ignore_index=True)
+            df_train = None
+            df_val = None
+        # 测试集预测
+        df_test = self.__predict_proba(df_test)
+        # 初始化输出值
+        gp = pd.DataFrame()
+        gp_auc = pd.DataFrame()
+        # train val test
+        for df, sample_type in zip([df_train, df_val, df_test], ['train', 'val', 'test']):
+            tmp, tmp_auc = self.__stats_liftvar(df, group_cols=group_cols, n_bin=n_bin,
+                                                feature_grid=feature_grid)
+            if tmp:
+                tmp['sample_type'] = sample_type
+                tmp_auc['auc_title'] = tmp_auc.apply(
+                    lambda x: 'cnt:{} auc:{} ks:{}'.format(x['cnt'], x['auc'], x['ks']))
+                tmp_auc['sample_type'] = sample_type
+                gp = pd.concat([gp, tmp])
+                gp_auc = pd.concat([gp_auc, tmp_auc])
+        # 如果分组的情况
+        if len(group_cols) > 0:
+            gp[group_cols] = gp[group_cols].astype(str)
+            gp['group_cols_str'] = gp[group_cols].apply(lambda x: ':'.join(x), axis=1)
+            gp_auc[group_cols] = gp_auc[group_cols].astype(str)
+            gp_auc['group_cols_str'] = gp_auc[group_cols].apply(lambda x: ':'.join(x), axis=1)
+        else:
+            gp['group_cols_str'] = ''
+            gp_auc['group_cols_str'] = ''
+        # 合并 gp,gp_auc
+        gp = gp.merge(gp_auc[['group_cols_str', 'sample_type', 'auc_title']], on=['group_cols_str', 'sample_type'],
+                      how='left')
+        # 生成图例
+        gp['legend_title'] = gp[['sample_type', 'group_cols_str', 'auc_title']].apply(lambda x: '::'.join(x), axis=1)
+        n = gp['group_cols_str'].nunique()
+        m = gp['sample_type'].nunique()
+        if m > 1 and n > 1:
+            # 多数据集+多维组合
+            for gcs in gp['group_cols_str'].unique():
+                fig = plotutil.plot_liftvar(gp[gp['group_cols_str'] == gcs], x1='lbl', y1='rate_bad', x2='lbl',
+                                            y2='accum_lift_bad',
+                                            title=gcs, group_col='legend_title', is_show=is_show)
+                if is_save:
+                    plotutil.save_fig_tohtml(self.__report_file, fig)
+        else:
+            fig = plotutil.plot_liftvar(gp, x1='lbl', y1='rate_bad', x2='lbl', y2='accum_lift_bad',
+                                        group_col='legend_title', is_show=is_show)
+            plotutil.save_fig_tohtml(self.__report_file, fig)
 
-        fig = plotutil.plot_liftvars(gp, x1='lbl', y1='rate_bad', x2='lbl', y2='accum_lift_bad', group_col='group_col',
-                                     is_show=False, title='liftchart')
+        return gp
 
-        return fig
-
-
-    def update_data(self,df_train,df_val,df_test):
+    def update_data(self, df_train, df_val, df_test):
         """
         更新数据集
         :param df_train:
@@ -154,9 +202,9 @@ class ModelReport:
         :param df_test:
         :return:
         """
-        self.__train=df_train
-        self.__val=df_val
-        self.__test=df_test
+        self.__train = df_train
+        self.__val = df_val
+        self.__test = df_test
 
     def report_feature(self, feature_name, group_col: str, n_bin=10, plot_trte=True):
         """
