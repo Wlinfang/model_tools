@@ -5,6 +5,7 @@ import pandas as pd
 from typing import List, Union
 
 import plotly.graph_objects as go
+import plotly.offline
 from plotly.subplots import make_subplots
 import plotly.express as px
 
@@ -242,7 +243,7 @@ def save_fig_tohtml(file_name: str, fig: go.Figure):
         raise ValueError(f'{file_name} must be a html ')
 
     with open(file_name, 'a') as f:
-        f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
+        f.write(fig.to_html(full_html=False, include_plotlyjs=True))
 
 
 def show_dash(figs):
