@@ -244,11 +244,12 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
     cls_cols = group_cols
-    if len(group_cols) == 0:
+    if group_cols is None or len(group_cols) == 0:
         cls_cols = ['lbl', 'lbl_index', 'lbl_left']
     else:
         # extend : 会 更新 group_cols的数据
         cls_cols = cls_cols + ['lbl', 'lbl_index', 'lbl_left']
+
     # 分组对y 进行计算
     gp = pd.pivot_table(df, values=y, index=cls_cols,
                         sort='lbl_index', aggfunc=['count', 'sum'],
@@ -256,13 +257,14 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     gp.columns = ['cnt', 'cnt_bad']
     gp['cnt_good'] = gp['cnt'] - gp['cnt_bad']
     gp['rate_bad'] = np.round(gp['cnt_bad'] / gp['cnt'], 3)
-    gp.reset_index(inplace=True)
-    if len(group_cols) == 0:
+
+    if group_cols is None or  len(group_cols) == 0:
         # 累计
         gp['accum_cnt_bad'] = gp['cnt_bad'].cumsum()
         gp['accum_cnt_good'] = gp['cnt_good'].cumsum()
         gp.loc['All', 'accum_cnt_bad'] = None
         gp.loc['All', 'accum_cnt_good'] = None
+
         # 坏样本占整体坏样本比例
         gp['accum_rate_bad_over_allbad'] = np.round(gp['accum_cnt_bad'] / gp.loc['All', 'cnt_bad'].values[0], 3)
         # 好样本占整体好样本比例
@@ -285,6 +287,7 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
         gp['accum_lift_bad'] = np.round(gp['accum_rate_bad_over_allbad'] / gp['all_rate_bad'], 3)
         # 删除
         gp.drop(['all_cnt_bad', 'all_cnt_good', 'all_rate_bad'], axis=1, inplace=True)
+    gp.reset_index(inplace=True)
     return gp
 
 

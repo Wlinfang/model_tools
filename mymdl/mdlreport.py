@@ -109,7 +109,7 @@ class ModelReport:
                              group_cols=group_cols)
         gp = gp.reset_index()
         # 分组计算 auc,ks,gini
-        if len(group_cols) > 0:
+        if group_cols is not None and len(group_cols) > 0:
             gp_auc = df.groupby(group_cols).apply(
                 lambda x: mdlutil.evaluate_binary_classier(x[self.__label], x[self.__pred], is_show=False))
             gp_auc = gp_auc.reset_index().rename(columns={0: 'value'})
@@ -165,7 +165,7 @@ class ModelReport:
                 gp = pd.concat([gp, tmp])
                 gp_auc = pd.concat([gp_auc, tmp_auc])
         # 如果分组的情况
-        if len(group_cols) > 0:
+        if group_cols is not None and len(group_cols) > 0:
             gp[group_cols] = gp[group_cols].astype(str)
             gp['group_cols_str'] = gp[group_cols].apply(lambda x: ':'.join(x), axis=1)
             gp_auc[group_cols] = gp_auc[group_cols].astype(str)
@@ -192,7 +192,9 @@ class ModelReport:
                     plotutil.save_fig_tohtml(self.__report_file, fig)
         else:
             fig = plotutil.plot_liftvar(gp, x1='lbl', y1='rate_bad', x2='lbl', y2='accum_lift_bad',
-                                        group_col='legend_title', hovertext=['cnt', 'cnt_bad'], is_show=is_show)
+                                        group_col='legend_title',
+                                        title='liftchart',
+                                        hovertext=['cnt', 'cnt_bad'], is_show=is_show)
             plotutil.save_fig_tohtml(self.__report_file, fig)
 
         return gp
