@@ -82,16 +82,30 @@ def plot_univar(df: pd.DataFrame, x: str, y: str,
 
 
 def plot_univar_with_bar(df: pd.DataFrame, x: str, y_line: str, y_bar: str,
-                         title='', is_show=False) -> go.Figure:
+                         group_col=None, title='', is_show=False) -> go.Figure:
     """
     单变量分布图:柱形图+折线图的联合分布
     :param y_line  折线图
     :param y_bar 柱形图
+    :param group_col 分组
     :param title:图片名字
     """
+    data = []
     df[x] = df[x].astype(str)
-    t1 = go.Bar(x=df[x], y=df[y_bar], name=y_bar, opacity=0.5)
-    t2 = go.Scatter(x=df[x], y=df[y_line], xaxis='x', yaxis='y2', name=y_line)
+    if group_col is None or len(group_col) == 0:
+        t1 = go.Bar(x=df[x], y=df[y_bar], name=y_bar, opacity=0.5)
+        t2 = go.Scatter(x=df[x], y=df[y_line], xaxis='x', yaxis='y2', name=y_line)
+        data = [t1, t2]
+    else:
+        gcs = df[group_col].unique()
+        colors = px.colors.qualitative.Dark24
+        for ix in range(0, len(gcs), 1):
+            gc = gcs[ix]
+            color = colors[ix]
+            tmp = df[df[group_col] == gc]
+            t1 = go.Bar(x=tmp[x], y=tmp[y_bar], name=y_bar, opacity=0.5,color=color)
+            t2 = go.Scatter(x=tmp[x], y=tmp[y_line], xaxis='x', yaxis='y2', name=y_line,color=color)
+            data.extend([t1,t2])
     layout = go.Layout(
         title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
         xaxis=dict(title=x, tickangle=-15),
@@ -101,63 +115,7 @@ def plot_univar_with_bar(df: pd.DataFrame, x: str, y_line: str, y_bar: str,
         width=900,
         height=900 * 0.618
     )
-    fig = go.Figure(data=[t1, t2], layout=layout)
-    if is_show:
-        fig.show()
-    return fig
-
-
-def plot_univar_and_pdp(df, x, y_true, y_pred, title='', group_col=None, is_show=False) -> go.Figure:
-    """
-    单变量分布图  变量x 同 y_true 的关系  变量 x 同 y_pred 的关系
-    :param df:
-    :param x:
-    :param y_cnt:
-    :param y_true:
-    :param y_pred:
-    :return:
-    """
-
-    fig = make_subplots(rows=2, cols=1, subplot_titles=('univar', 'pdp'))
-    if pd.isna(group_col) or len(group_col) == 0:
-        fig.add_trace(
-            go.Scatter(x=df[x], y=df[y_true]),
-            row=1, col=1
-        )
-        # pdp
-        fig.add_trace(
-            go.Scatter(x=df[x], y=df[y_pred]),
-            row=2, col=1
-        )
-    else:
-        colors = px.colors.qualitative.Dark24
-        # 图例
-        labels = df[group_col].unique()
-        for ix in range(0, len(labels), 1):
-            gc = labels[ix]
-            color = colors[ix]
-            tmp = df[df[group_col] == gc]
-            # 单变量图
-            fig.add_trace(
-                go.Scatter(x=tmp[x], y=tmp[y_true],
-                           legendgroup='group', name=gc,
-                           hovertext=gc, line=dict(color=color)),
-                row=1, col=1
-            )
-            # pdp
-            fig.add_trace(
-                go.Scatter(x=tmp[x], y=tmp[y_pred], legendgroup='group',
-                           showlegend=False, hovertext=gc, line=dict(color=color)),
-                row=2, col=1
-            )
-    fig.update_yaxes(
-        matches=None
-    )
-    fig.update_layout(
-        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
-        width=900,
-        height=900 * 0.618
-    )
+    fig = go.Figure(data=data, layout=layout)
     if is_show:
         fig.show()
     return fig
@@ -165,7 +123,7 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, title='', group_col=None, is_show
 
 def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
                  title='', f1_title='', f2_title='',
-                 group_col=None,hovertext=None,
+                 group_col=None,
                  is_show=True) -> go.Figure:
     """
     适用于 子图(x1,y1) 子图(x2,y2) 一行2个子图的情况，2个子图均为折线图
@@ -202,13 +160,13 @@ def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
             fig.add_trace(
                 go.Scatter(x=tmp[x1], y=tmp[y1],
                            legendgroup='group', name=gc,
-                           hovertext=hovertext, line=dict(color=color)),
+                           hovertext=gc, line=dict(color=color)),
                 row=1, col=1
             )
             # lift 图
             fig.add_trace(
                 go.Scatter(x=tmp[x2], y=tmp[y2], legendgroup='group',
-                           showlegend=False, hovertext=hovertext, line=dict(color=color)),
+                           showlegend=False, hovertext=gc, line=dict(color=color)),
                 row=1, col=2
             )
     fig.update_yaxes(
@@ -217,9 +175,9 @@ def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
     fig.update_layout(
         title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
         # 横向图例
-        legend=dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h'),
-        width=900,
-        height=900 * 0.618,
+        legend=dict(orientation='h', yanchor="bottom", y=-0.4, xanchor="left", x=0),
+        width=1000,
+        height=1000 * 0.618,
         xaxis=dict(tickangle=-30),
         # 第二个子图的横坐标轴
         xaxis2=dict(tickangle=-30),

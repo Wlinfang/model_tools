@@ -186,11 +186,12 @@ def univar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
     # 对应的y mean 计算
-    if len(group_cols) == 0:
-        group_cols = ['lbl', 'lbl_index', 'lbl_left']
+    cls_cols = []
+    if group_cols is None or len(group_cols) == 0:
+        cls_cols = ['lbl', 'lbl_index', 'lbl_left']
     else:
-        group_cols.extend(['lbl', 'lbl_index', 'lbl_left'])
-    gp = pd.pivot_table(df, values=y, index=group_cols,
+        cls_cols = group_cols + ['lbl', 'lbl_index', 'lbl_left']
+    gp = pd.pivot_table(df, values=y, index=cls_cols,
                         sort='lbl_index', aggfunc=['count', 'sum'],
                         fill_value=0, margins=False, observed=True)
     # 分组计算 y 的数量
@@ -257,8 +258,7 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     gp.columns = ['cnt', 'cnt_bad']
     gp['cnt_good'] = gp['cnt'] - gp['cnt_bad']
     gp['rate_bad'] = np.round(gp['cnt_bad'] / gp['cnt'], 3)
-
-    if group_cols is None or  len(group_cols) == 0:
+    if group_cols is None or len(group_cols) == 0:
         # 累计
         gp['accum_cnt_bad'] = gp['cnt_bad'].cumsum()
         gp['accum_cnt_good'] = gp['cnt_good'].cumsum()
@@ -277,6 +277,9 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
         tmp = gp.groupby(group_cols).agg(all_cnt_bad=('cnt_bad', 'sum'),
                                          all_cnt_good=('cnt_good', 'sum')).reset_index()
         tmp['all_rate_bad'] = np.round(tmp['all_cnt_bad'] / (tmp['all_cnt_bad'] + tmp['all_cnt_good']), 3)
+        # index = group_cols + ['lbl', 'lbl_index', 'lbl_left']
+        # tmp = index = group_cols 需要对其，否则丢失字段
+        gp = gp.reset_index()
         gp = gp.merge(tmp, on=group_cols, how='left')
 
         # 坏样本占整体坏样本比例

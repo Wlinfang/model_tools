@@ -44,7 +44,6 @@ class ModelReport:
     def __stats_univar(self, df, feature_name, group_cols=[], n_bin=10, feature_grid=[]):
         """
         统计单个变量的 y_true,y_pred 的情况
-        :param df: self.__train,self.__val,self.__test
         :param feature_name:
         :param group_col:
         :param n_bin:
@@ -57,7 +56,7 @@ class ModelReport:
                                  n_bin=n_bin, cut_type=1, group_cols=group_cols)
         gp_pred = mdlutil.univar(df, feature_name, self.__pred, feature_grid=feature_grid,
                                  n_bin=n_bin, cut_type=1, group_cols=group_cols)
-        if len(group_cols) == 0:
+        if group_cols is None or len(group_cols) == 0:
             cls_col = ['lbl', 'lbl_index', 'lbl_left']
         else:
             cls_col = group_cols + ['lbl', 'lbl_index', 'lbl_left']
@@ -65,37 +64,6 @@ class ModelReport:
         gp_pred.rename(columns={'avg': 'score_avg'}, inplace=True)
         gp_true = gp_true.merge(gp_pred[cls_col + ['score_avg']], on=cls_col, how='left')
         return gp_true
-
-    def __stats_univar_trte(self, feature_name, group_col, n_bin=10, plot_trte=True):
-        """
-        统计单个变量的 y_true,y_pred 的情况
-        :param feature_name:
-        :param group_col:
-        :param n_bin:
-        :param plot_trte:
-        :return: sample_type,group_col,lbl,lbl_index,lbl_left,cnt,sum,rate_bad,score_avg
-        """
-        feature_grid = []
-        if plot_trte:
-            feature_grid = mdlutil.get_feature_grid(self.__train[feature_name], cut_type=1,
-                                                    n_bin=n_bin)
-        # 训练集
-        gp_train = self.__stats_univar(self.__train, feature_name, [group_col], n_bin, feature_grid)
-        gp_train['sample_type'] = 'train'
-        # 验证集
-        gp_val = self.__stats_univar(self.__val, feature_name, [group_col], n_bin, feature_grid)
-        if gp_val is not None:
-            gp_val['sample_type'] = 'val'
-        # 测试集
-        gp_test = self.__stats_univar(self.__test, feature_name, [group_col], n_bin, feature_grid)
-        gp_test['sample_type'] = 'test'
-        if plot_trte:
-            if gp_val is not None:
-                return pd.concat([gp_train, gp_val, gp_test], ignore_index=True)
-            else:
-                return pd.concat([gp_train, gp_test], ignore_index=True)
-        else:
-            return gp_test
 
     def __stats_liftvar(self, df, group_cols=[], n_bin=10, feature_grid=[]):
         """
@@ -122,14 +90,14 @@ class ModelReport:
             gp_auc = pd.DataFrame([[cnt, auc, ks, gini]], columns=['cnt', 'auc', 'ks', 'gini'], index=['all'])
         return gp, gp_auc
 
-    def report_liftchart(self, df_train, df_val, df_test, n_bin=10,
+    def report_liftchart(self, df_train, df_test, n_bin=10,
                          group_cols=[],
                          plot_trte=True,
                          is_show=False, is_save=False) -> pd.DataFrame:
         """
         输出模型分的lift 表现;df_test 必须有值；
         :param group_cols 分组查看
-        :param plot_trte:True,输出训练集，测试集、验证集[可选]的表现  False : 只看 test 的表现
+        :param plot_trte:True,输出训练集、验证集[可选]的表现  False : 只看 test 的表现
         :return:
         """
         if df_test is None:
@@ -138,11 +106,8 @@ class ModelReport:
         if plot_trte and df_train is None:
             raise ValueError('df_train is None！！！')
             return None
-        if not plot_trte:
-            df_train = None
-            df_val = None
         # 模型分预测
-        for df in [df_train, df_val, df_test]:
+        for df in [df_train, df_test]:
             df = self.__predict_proba(df)
         feature_grid = []
         if plot_trte:
@@ -151,9 +116,8 @@ class ModelReport:
         # 初始化输出值
         gp = pd.DataFrame()
         gp_auc = pd.DataFrame()
-        # train val test
-        i = 0
-        for df, sample_type in zip([df_train, df_val, df_test], ['train', 'val', 'test']):
+        # train test
+        for df, sample_type in zip([df_train, df_test], ['train', 'test']):
             tmp, tmp_auc = self.__stats_liftvar(df, group_cols=group_cols, n_bin=n_bin,
                                                 feature_grid=feature_grid)
             if tmp is not None and len(tmp) > 0:
@@ -186,7 +150,7 @@ class ModelReport:
             for gcs in gp['group_cols_str'].unique():
                 fig = plotutil.plot_liftvar(gp[gp['group_cols_str'] == gcs], x1='lbl', y1='rate_bad', x2='lbl',
                                             y2='accum_lift_bad',
-                                            title=gcs, group_col='legend_title', hovertext=['cnt', 'cnt_bad'],
+                                            title=gcs, group_col='legend_title',
                                             is_show=is_show)
                 if is_save:
                     plotutil.save_fig_tohtml(self.__report_file, fig)
@@ -194,24 +158,82 @@ class ModelReport:
             fig = plotutil.plot_liftvar(gp, x1='lbl', y1='rate_bad', x2='lbl', y2='accum_lift_bad',
                                         group_col='legend_title',
                                         title='liftchart',
-                                        hovertext=['cnt', 'cnt_bad'], is_show=is_show)
+                                        is_show=is_show)
             plotutil.save_fig_tohtml(self.__report_file, fig)
 
         return gp
 
-    # def report_feature(self, feature_name, group_col: str, n_bin=10, plot_trte=True):
-    #     """
-    #     分析单个变量::只看测试集的情况
-    #     :param feature_name:
-    #     :param group_col:当前只支持 单维度分组，后续增加多维度分组
-    #     :param plot_trte : True 表示 plot train+test; False: 只plot test
-    #     :return: go.Figure
-    #     """
-    #     gp = self.__stats_univar(feature_name, group_col, n_bin, plot_trte)
-    #     fig = plotutil.plot_univar_and_pdp(gp, x=feature_name, y_true='rate_bad', y_pred='score_avg',
-    #                                        group_col=group_col, is_show=False,
-    #                                        title=self.__feature_dict[feature_name])
-    #     return fig
+    def report_feature(self, df_train, df_test, feature_name, group_cols=[], n_bin=10, plot_trte=True,
+                       is_show=False, is_save=False):
+        """
+        分析单个变量::测试集的情况; feature_name & [y_true,y_pred]
+        :param feature_name:
+        :param group_cols:
+        :param plot_trte : True 表示 plot train+test; False: 只plot test
+        :return: go.Figure
+        """
+        if plot_trte and df_train is None:
+            return None
+        if df_test is None:
+            return None
+
+        feature_name_desc = self.__feature_dict[feature_name]
+        # 初始化输出值
+        gp = pd.DataFrame()
+        feature_grid = []
+        if plot_trte:
+            feature_grid = mdlutil.get_feature_grid(df_train[feature_name], cut_type=1, n_bin=n_bin)
+        for df, sample_type in zip([df_train, df_test], ['train', 'test']):
+            if df is not None:
+                # 预测分值
+                df = self.__predict_proba(df_train)
+                # 统计数据
+                tmp = self.__stats_univar(df, feature_name, group_cols, n_bin, feature_grid)
+                tmp['sample_type'] = sample_type
+                gp = pd.concat([gp, tmp])
+        # group_cols 汇总为1个字段
+        if group_cols is not None and len(group_cols) > 0:
+            gp[group_cols] = gp[group_cols].astype(str)
+            gp['group_cols_str'] = gp[group_cols].apply(lambda x: ':'.join(x), axis=1)
+        else:
+            gp['group_cols_str'] = ''
+
+        # 图例标题
+        gp['legend_title'] = gp[['sample_type', 'group_cols_str']].apply(lambda x: '::'.join(x), axis=1)
+
+        if plot_trte and gp['group_cols_str'].nunique() > 1:
+            # 多数据集+多维
+            for gcs in gp['group_cols_str'].unique():
+                tmp = gp[gp['group_cols_str'] == gcs]
+                # univar
+                fig = plotutil.plot_univar_with_bar(tmp, x='lbl', y_line='rate_bad', y_bar='cnt',
+                                                    group_col='legend_title',
+                                                    title='::'.join([feature_name, feature_name_desc]),
+                                                    is_show=is_show)
+                if is_save:
+                    plotutil.save_fig_tohtml(self.__report_file,fig)
+                # pdp
+                fig = plotutil.plot_univar(tmp, x='lbl', y='score_avg', group_col='legend_title',
+                                           title='pdp-{}'.format(feature_name),
+                                           is_show=is_show)
+                if is_save:
+                    plotutil.save_fig_tohtml(self.__report_file,fig)
+        else:
+            # univar
+            fig = plotutil.plot_univar_with_bar(gp, x='lbl', y_line='rate_bad', y_bar='cnt',
+                                                group_col='legend_title',
+                                                title='::'.join([feature_name, feature_name_desc]),
+                                                is_show=is_show)
+            if is_save:
+                plotutil.save_fig_tohtml(self.__report_file, fig)
+            # pdp
+            fig = plotutil.plot_univar(gp, x='lbl', y='score_avg', group_col='legend_title',
+                                       title='pdp-{}'.format(feature_name),
+                                       is_show=is_show)
+            if is_save:
+                plotutil.save_fig_tohtml(self.__report_file, fig)
+
+        return gp
 
     # def report_features(self):
     #     """
