@@ -2,13 +2,17 @@ import pandas as pd
 import numpy as np
 from typing import Union
 from sklearn import metrics
+from scipy import stats
 import plotly.graph_objects as go
 
 from model_tools.utils.toolutil import del_none
-
 import logging
-
 logger = logging.getLogger(__file__)
+
+pd.set_option('display.float_format', lambda x: '%.3f' % x)
+pd.set_option('display.precision',3)
+pd.set_option('display.max_rows',2000)
+pd.set_option('display.max_columns',2000)
 
 
 def get_feature_grid(values: Union[list, np.array],
@@ -409,7 +413,11 @@ def woe(df: pd.DataFrame, x: str, y: str, feature_grid=[], cut_type=1, n_bin=10)
     woe = ln (坏人比例) / (好人比例)
     坏人比例 =  组内的坏人数/ 总坏人数
     好人比例 = 组内的好人数/ 总好人数
-    :param df:
+    缺失值的woe 可不满足单调性，因为缺失值尤其逻辑含义
+    如果相邻分箱的woe值相同，则合并为1个分箱
+    当一个分箱内只有bad 或者 good时，修正公式公式计算中，加入 eps
+    如果训练集woe满足单调性；but 验证集或测试集上不满足，则分箱不合理或者这个特征不稳定，时效性差
+    :param df
     :param y 二值变量  定义 坏=1  好=0
     """
     # 好人比例 = rate_good_over_allgood
@@ -447,3 +455,45 @@ def iv(df: pd.DataFrame, x: str, y: str, feature_grid=[], cut_type=1, n_bin=10):
     """
     gp = woe(df, x, y, feature_grid, cut_type, n_bin)
     return np.round(np.sum(gp['iv_bin']), 2)
+
+
+class Confidence:
+    """
+    假设估计置信度区间计算
+    confidence：置信度
+    is_biased_estimate：计算标准差是有偏还是无偏；True:有偏；利用样本估计总体标准差
+    """
+
+    def __init__(self, confidence=0.95, is_biased_estimate=False):
+        super(Confidence, self).__init__()
+        self.confidence = confidence
+        self.is_biased_estimate = is_biased_estimate
+
+    def check_norm_confidence(self,df, feature_name):
+        '''
+        计算正太分布的置信区间
+        confidence:置信度
+        is_biased_estimate：计算标准差是有偏还是无偏；True:有偏；利用样本估计总体标准差
+        '''
+        sample_mean = df[feature_name].mean()
+        if self.is_biased_estimate:
+            # 有偏估计
+            sample_std = df[feature_name].std(ddof=0)
+        else:
+            # 无偏
+            sample_std = df[feature_name].std(ddof=1)
+        return stats.norm.interval(self.confidence, loc=sample_mean, scale=sample_std)
+
+    def check_t_confidence(self,df, feature_name):
+        '''
+        计算t分布的置信区间
+        '''
+        sample_mean = df[feature_name].mean()
+        if self.is_biased_estimate:
+            # 有偏估计
+            sample_std = df[feature_name].std(ddof=0)
+        else:
+            # 无偏
+            sample_std = df[feature_name].std(ddof=1)
+
+        return stats.t.interval(self.confidence, df=(df.shape[0] - 1), loc=sample_mean, scale=sample_std)
