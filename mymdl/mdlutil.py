@@ -181,6 +181,8 @@ def univar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     :param feature_grid cut_type n_bin
     :param group_cols 分组统计
     """
+    if df is None or len(df)==0:
+        return None
     # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
     # 对应的y mean 计算

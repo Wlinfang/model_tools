@@ -32,7 +32,7 @@ def plot_bar(df: pd.DataFrame, x: str, y: str,
         bargap=0.8,  # 组间距离
         bargroupgap=0.2,  # 组内距离
         width=900,
-        height=900*0.618
+        height=900 * 0.618
     )
     if is_show:
         fig.show()
@@ -89,7 +89,7 @@ def plot_univar_with_bar(df: pd.DataFrame, x: str, y_line: str, y_bar: str,
     :param title:图片名字
     """
     df[x] = df[x].astype(str)
-    t1 = go.Bar(x=df[x], y=df[y_bar], name=y_bar,opacity=0.5)
+    t1 = go.Bar(x=df[x], y=df[y_bar], name=y_bar, opacity=0.5)
     t2 = go.Scatter(x=df[x], y=df[y_line], xaxis='x', yaxis='y2', name=y_line)
     layout = go.Layout(
         title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
@@ -105,7 +105,8 @@ def plot_univar_with_bar(df: pd.DataFrame, x: str, y_line: str, y_bar: str,
         fig.show()
     return fig
 
-def plot_univar_and_pdp(df, x, y_true, y_pred, title='', group_col=None,is_show=False) -> go.Figure:
+
+def plot_univar_and_pdp(df, x, y_true, y_pred, title='', group_col=None, is_show=False) -> go.Figure:
     """
     单变量分布图  变量x 同 y_true 的关系  变量 x 同 y_pred 的关系
     :param df:
@@ -117,7 +118,7 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, title='', group_col=None,is_show=
     """
 
     fig = make_subplots(rows=2, cols=1, subplot_titles=('univar', 'pdp'))
-    if pd.isna(group_col) or len(group_col)==0:
+    if pd.isna(group_col) or len(group_col) == 0:
         fig.add_trace(
             go.Scatter(x=df[x], y=df[y_true]),
             row=1, col=1
@@ -134,7 +135,7 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, title='', group_col=None,is_show=
         for ix in range(0, len(labels), 1):
             gc = labels[ix]
             color = colors[ix]
-            tmp=df[df[group_col] == gc]
+            tmp = df[df[group_col] == gc]
             # 单变量图
             fig.add_trace(
                 go.Scatter(x=tmp[x], y=tmp[y_true],
@@ -192,38 +193,42 @@ def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
     return fig
 
 
-def plot_liftvars(xs1: List[Union[list, pd.Series, np.array]],
-                  ys1: List[Union[list, pd.Series, np.array]],
-                  xs2: List[Union[list, pd.Series, np.array]],
-                  ys2: List[Union[list, pd.Series, np.array]],
-                  title,
-                  fig_titles, is_show=False
-                  ):
+def plot_liftvars(df, x1, y1, x2, y2, group_col: str,
+                  title, is_show=False):
     """
-    适用于多个数据集的情况，比如 训练集、测试集、验证集;2个子图
-    n = len(xs1) = len(xs2) = len(ys1) = len(ys2) 表示有 n 个数据集
-    :param (xs1[0],ys1[0]) (xs2[0],ys2[0]) 相当于 plot_liftvar 一个数据集的lift 图
-    :param fig_titles : 每个数据集的title len(fig_titles) = n
+    适用于分组的lift 图；训练集、验证集、测试集
     :return:
     """
     # 一行 两列
     fig = make_subplots(rows=1, cols=2, subplot_titles=('', ''))
-    for x1, y1, x2, y2, f_title in zip(xs1, ys1, xs2, ys2, fig_titles):
-        # traces
+    gcs = df[group_col].unique()
+    colors = px.colors.qualitative.Dark24
+    for ix in range(0, len(gcs), 1):
+        gc = gcs[ix]
+        color = colors[ix]
+        tmp = df[df[group_col] == gc]
+        # 单变量折线图
         fig.add_trace(
-            go.Scatter(x=x1, y=y1, name=f_title, mode='lines+markers'),
+            go.Scatter(x=tmp[x1], y=tmp[y1],
+                       legendgroup='group', name=gc,
+                       hovertext=gc, line=dict(color=color)),
             row=1, col=1
         )
+        # lift 图
         fig.add_trace(
-            go.Scatter(x=x2, y=y2, name=f_title, mode='lines+markers'),
-            row=1, col=1
+            go.Scatter(x=tmp[x2], y=tmp[y2], legendgroup='group',
+                       showlegend=False, hovertext=gc, line=dict(color=color)),
+            row=1, col=2
         )
+    fig.update_yaxes(
+        matches=None
+    )
     fig.update_layout(
         title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
-        legend=dict(yanchor="top", y=1.2, xanchor="right", x=1),
-        xaxis=dict(tickangle=-45),
-        # 第二个子图的横坐标轴
-        xaxis2=dict(tickangle=-45),
+        # 横向图例
+        legend=dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h'),
+        width=900,
+        height=900 * 0.618
     )
     if is_show:
         fig.show()
