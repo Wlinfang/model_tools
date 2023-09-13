@@ -61,7 +61,6 @@ def get_feature_grid(values: Union[list, np.array],
         # 包括无穷大，样本集中数据可能有些最小值，最大值不全
         f[0] = -np.Inf
         f[-1] = np.inf
-    print(f)
     return np.round(f, 3)
 
 
