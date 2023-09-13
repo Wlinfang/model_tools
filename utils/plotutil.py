@@ -163,63 +163,48 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, title='', group_col=None, is_show
 
 
 def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
-                 title='', f1_title='', f2_title='', is_show=True) -> go.Figure:
+                 title='', f1_title='', f2_title='',
+                 group_col=None,
+                 is_show=True) -> go.Figure:
     """
-    适用于(x1,y1) (x2,y2) 一行2个子图的情况，2个子图均为折线图
+    适用于 子图(x1,y1) 子图(x2,y2) 一行2个子图的情况，2个子图均为折线图
     :param title 整个图的名称； f1_title 第一个子图的名称；f2_title 第二个子图的名称
+    :param group_col:str 分组
     :return:fig
     """
     # 一行 两列
-    fig = make_subplots(rows=1, cols=2, subplot_titles=('', ''))
-    # traces
-    fig.add_trace(
-        go.Scatter(x=df[x1], y=df[y1], name=f1_title, mode='lines+markers'),
-        row=1, col=1
-    )
-
-    fig.add_trace(
-        go.Scatter(x=df[x2], y=df[y2], name=f2_title, mode='lines+markers'),
-        row=1, col=2
-    )
-    fig.update_layout(
-        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
-        legend=dict(yanchor="top", y=1.2, xanchor="right", x=1),
-        xaxis=dict(tickangle=-45),
-        # 第二个子图的横坐标轴
-        xaxis2=dict(tickangle=-45),
-    )
-    if is_show:
-        fig.show()
-    return fig
-
-
-def plot_liftvars(df, x1, y1, x2, y2, group_col: str,
-                  title, is_show=False):
-    """
-    适用于分组的lift 图；训练集、验证集、测试集
-    :return:
-    """
-    # 一行 两列
-    fig = make_subplots(rows=1, cols=2, subplot_titles=('', ''))
-    gcs = df[group_col].unique()
-    colors = px.colors.qualitative.Dark24
-    for ix in range(0, len(gcs), 1):
-        gc = gcs[ix]
-        color = colors[ix]
-        tmp = df[df[group_col] == gc]
-        # 单变量折线图
+    fig = make_subplots(rows=1, cols=2, subplot_titles=(f1_title, f2_title))
+    if pd.isna(group_col) or len(group_col)==0:
+        # y_true
         fig.add_trace(
-            go.Scatter(x=tmp[x1], y=tmp[y1],
-                       legendgroup='group', name=gc,
-                       hovertext=gc, line=dict(color=color)),
+            go.Scatter(x=df[x1], y=df[y1], mode='lines+markers'),
             row=1, col=1
         )
-        # lift 图
+        # y_pred
         fig.add_trace(
-            go.Scatter(x=tmp[x2], y=tmp[y2], legendgroup='group',
-                       showlegend=False, hovertext=gc, line=dict(color=color)),
+            go.Scatter(x=df[x2], y=df[y2], mode='lines+markers'),
             row=1, col=2
         )
+    else:
+        gcs = df[group_col].unique()
+        colors = px.colors.qualitative.Dark24
+        for ix in range(0, len(gcs), 1):
+            gc = gcs[ix]
+            color = colors[ix]
+            tmp = df[df[group_col] == gc]
+            # 单变量折线图
+            fig.add_trace(
+                go.Scatter(x=tmp[x1], y=tmp[y1],
+                           legendgroup='group', name=gc,
+                           hovertext=gc, line=dict(color=color)),
+                row=1, col=1
+            )
+            # lift 图
+            fig.add_trace(
+                go.Scatter(x=tmp[x2], y=tmp[y2], legendgroup='group',
+                           showlegend=False, hovertext=gc, line=dict(color=color)),
+                row=1, col=2
+            )
     fig.update_yaxes(
         matches=None
     )
@@ -228,12 +213,14 @@ def plot_liftvars(df, x1, y1, x2, y2, group_col: str,
         # 横向图例
         legend=dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h'),
         width=900,
-        height=900 * 0.618
+        height=900 * 0.618,
+        xaxis=dict(tickangle=-15),
+        # 第二个子图的横坐标轴
+        xaxis2=dict(tickangle=-15),
     )
     if is_show:
         fig.show()
     return fig
-
 
 def save_fig_tohtml(file_name: str, fig: go.Figure):
     """
