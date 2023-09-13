@@ -316,7 +316,7 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
     # 标注最大值
     ks_max_index = ks.argmax()
     ks_max_y = ks[ks_max_index]
-    ks_max_x = ks[ks_max_index]
+    ks_max_x = fpr[ks_max_index]
     # roc 图，ks 图
     # x=fpr;;; y = tpr  ks
     gini = np.round(2 * auc - 1, 3)
