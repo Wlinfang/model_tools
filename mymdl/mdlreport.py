@@ -104,7 +104,7 @@ class ModelReport:
         :return: df_lift, df_auc
         """
         if df is None:
-            return None, None, None
+            return None, None
         gp = mdlutil.liftvar(df, self.__pred, self.__label, feature_grid=feature_grid, cut_type=1, n_bin=n_bin,
                              group_cols=group_cols)
         gp = gp.reset_index()
@@ -118,8 +118,8 @@ class ModelReport:
             gp_auc.drop(['value'], axis=1, inplace=True)
             return gp, gp_auc
         else:
-            auc, ks, gini = mdlutil.evaluate_binary_classier(df[self.__label], df[self.__pred])
-            gp_auc = pd.DataFrame([[len(df), auc, ks, gini]], columns=['cnt', 'auc', 'ks', 'gini'], index=['all'])
+            cnt, auc, ks, gini = mdlutil.evaluate_binary_classier(df[self.__label], df[self.__pred])
+            gp_auc = pd.DataFrame([[cnt, auc, ks, gini]], columns=['cnt', 'auc', 'ks', 'gini'], index=['all'])
         return gp, gp_auc
 
     def report_liftchart(self, df_train, df_val, df_test, n_bin=10,
@@ -152,13 +152,15 @@ class ModelReport:
         gp = pd.DataFrame()
         gp_auc = pd.DataFrame()
         # train val test
+        i = 0
         for df, sample_type in zip([df_train, df_val, df_test], ['train', 'val', 'test']):
             tmp, tmp_auc = self.__stats_liftvar(df, group_cols=group_cols, n_bin=n_bin,
                                                 feature_grid=feature_grid)
             if tmp is not None and len(tmp) > 0:
                 tmp['sample_type'] = sample_type
+
                 tmp_auc['auc_title'] = tmp_auc.apply(
-                    lambda x: 'cnt:{} auc:{} ks:{}'.format(x['cnt'], x['auc'], x['ks']))
+                    lambda x: 'cnt:{} auc:{} ks:{}'.format(x['cnt'], x['auc'], x['ks']), axis=1)
                 tmp_auc['sample_type'] = sample_type
                 gp = pd.concat([gp, tmp])
                 gp_auc = pd.concat([gp_auc, tmp_auc])
@@ -175,7 +177,7 @@ class ModelReport:
         gp = gp.merge(gp_auc[['group_cols_str', 'sample_type', 'auc_title']], on=['group_cols_str', 'sample_type'],
                       how='left')
         # 生成图例
-        gp['legend_title'] = gp[['sample_type', 'group_cols_str', 'auc_title']].apply(lambda x: '::'.join(x), axis=1)
+        gp['legend_title'] = gp[['sample_type', 'group_cols_str', 'auc_title']].fillna('').apply(lambda x: '::'.join(x), axis=1)
         n = gp['group_cols_str'].nunique()
         m = gp['sample_type'].nunique()
         if m > 1 and n > 1:

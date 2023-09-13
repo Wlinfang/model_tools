@@ -172,9 +172,14 @@ def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
     :param group_col:str 分组
     :return:fig
     """
+    if df is None:
+        return None
+    df[x1] = df[x1].astype(str)
+    if x2 != x1:
+        df[x2] = df[x2].astype(str)
     # 一行 两列
     fig = make_subplots(rows=1, cols=2, subplot_titles=(f1_title, f2_title))
-    if pd.isna(group_col) or len(group_col)==0:
+    if pd.isna(group_col) or len(group_col) == 0:
         # y_true
         fig.add_trace(
             go.Scatter(x=df[x1], y=df[y1], mode='lines+markers'),
@@ -214,13 +219,14 @@ def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
         legend=dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h'),
         width=900,
         height=900 * 0.618,
-        xaxis=dict(tickangle=-15),
+        xaxis=dict(tickangle=-30),
         # 第二个子图的横坐标轴
-        xaxis2=dict(tickangle=-15),
+        xaxis2=dict(tickangle=-30),
     )
     if is_show:
         fig.show()
     return fig
+
 
 def save_fig_tohtml(file_name: str, fig: go.Figure):
     """

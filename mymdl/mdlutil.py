@@ -309,6 +309,8 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
     | Roc 曲线：y-axis=真正率 ; x-axis=假正率； 无视样本不均衡问题
     :return cnt,auc,ks,gini
     """
+    if y_true is None or y_pred is None or len(y_true) == 0 or len(y_pred) == 0:
+        return None, None, None, None
     if len(np.unique(y_true)) == 1:
         # only one class
         logger.info('only one class !!!')
