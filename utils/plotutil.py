@@ -102,18 +102,19 @@ def plot_univar_with_bar(df: pd.DataFrame, x: str, y_line: str, y_bar: str,
             gc = gcs[ix]
             color = colors[ix]
             tmp = df[df[group_col] == gc]
-            t1 = go.Bar(x=tmp[x], y=tmp[y_bar], name=y_bar, opacity=0.5, marker=dict(color=color),
+            t1 = go.Bar(x=tmp[x], y=tmp[y_bar], name=gc, opacity=0.5, marker=dict(color=color),
                         legendgroup='group')
             t2 = go.Scatter(x=tmp[x], y=tmp[y_line], xaxis='x',
-                            yaxis='y2', name=y_line, line=dict(color=color),
-                            legendgroup='group',showlegend=False)
+                            yaxis='y2', name=gc, line=dict(color=color),
+                            legendgroup='group', showlegend=False)
             data.extend([t1, t2])
     layout = go.Layout(
         title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
         xaxis=dict(title=x, tickangle=-15),
         yaxis=dict(title=y_bar, zeroline=True),
         yaxis2=dict(title=y_line, anchor='x', overlaying='y', zeroline=True, side='right'),
-        legend=dict(yanchor="top", y=1.2, xanchor="right", x=1),
+        # legend=dict(yanchor="top", y=1.2, xanchor="right", x=1),
+        legend=dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h'),
         width=900,
         height=900 * 0.618
     )

@@ -186,7 +186,7 @@ class ModelReport:
         for df, sample_type in zip([df_train, df_test], ['train', 'test']):
             if df is not None:
                 # 预测分值
-                df = self.__predict_proba(df_train)
+                df = self.__predict_proba(df)
                 # 统计数据
                 tmp = self.__stats_univar(df, feature_name, group_cols, n_bin, feature_grid)
                 tmp['sample_type'] = sample_type
