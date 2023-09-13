@@ -10,9 +10,7 @@ from model_tools.utils import plotutil
 
 class ModelReport:
     def __int__(self, estimator, features: Union[list, np.array, pd.Series],
-                feature_dict: dict,
-                y: str,
-                report_file):
+                feature_dict: dict, y: str, report_file):
         """
         :param estimator 学习器，必须有 predict_proba() 方法
         :param features:特征名
