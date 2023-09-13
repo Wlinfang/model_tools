@@ -9,11 +9,15 @@ from model_tools.utils import plotutil
 
 
 class ModelReport:
-    def __int__(self, estimator, features: Union[list, np.array, pd.Series],
-                feature_dict: dict, y: str, report_file):
+    """
+    适用于模型报告输出
+    """
+
+    def __init__(self, estimator, features: Union[list, np.array, pd.Series],
+                 feature_dict: dict, y: str, report_file):
         """
         :param estimator 学习器，必须有 predict_proba() 方法
-        :param features:特征名
+        :param features:入模的特征名 Union[list, np.array, pd.Series]
         :param feature_dict  特征字典 {'a':'申请次数'}
         :param y 目标变量名
         :param report_file :输出的报告，html 格式
@@ -134,19 +138,16 @@ class ModelReport:
         if plot_trte and df_train is None:
             raise ValueError('df_train is None！！！')
             return None
-        feature_grid = []
-        if plot_trte:
-            # 预测分值
-            df_train = self.__predict_proba(df_train)
-            feature_grid = mdlutil.get_feature_grid(df_train[self.__pred], cut_type=1, n_bin=n_bin)
-            # 验证集预测
-            if df_val is not None:
-                df_val = self.__predict_proba(df_val)
-        else:
+        if not plot_trte:
             df_train = None
             df_val = None
-        # 测试集预测
-        df_test = self.__predict_proba(df_test)
+        # 模型分预测
+        for df in [df_train, df_val, df_test]:
+            df = self.__predict_proba(df)
+        feature_grid = []
+        if plot_trte:
+            # 训练集分组
+            feature_grid = mdlutil.get_feature_grid(df_train[self.__pred], cut_type=1, n_bin=n_bin)
         # 初始化输出值
         gp = pd.DataFrame()
         gp_auc = pd.DataFrame()
@@ -154,7 +155,7 @@ class ModelReport:
         for df, sample_type in zip([df_train, df_val, df_test], ['train', 'val', 'test']):
             tmp, tmp_auc = self.__stats_liftvar(df, group_cols=group_cols, n_bin=n_bin,
                                                 feature_grid=feature_grid)
-            if tmp:
+            if tmp is not None and len(tmp) > 0:
                 tmp['sample_type'] = sample_type
                 tmp_auc['auc_title'] = tmp_auc.apply(
                     lambda x: 'cnt:{} auc:{} ks:{}'.format(x['cnt'], x['auc'], x['ks']))
@@ -192,41 +193,29 @@ class ModelReport:
 
         return gp
 
-    def update_data(self, df_train, df_val, df_test):
-        """
-        更新数据集
-        :param df_train:
-        :param df_val:
-        :param df_test:
-        :return:
-        """
-        self.__train = df_train
-        self.__val = df_val
-        self.__test = df_test
+    # def report_feature(self, feature_name, group_col: str, n_bin=10, plot_trte=True):
+    #     """
+    #     分析单个变量::只看测试集的情况
+    #     :param feature_name:
+    #     :param group_col:当前只支持 单维度分组，后续增加多维度分组
+    #     :param plot_trte : True 表示 plot train+test; False: 只plot test
+    #     :return: go.Figure
+    #     """
+    #     gp = self.__stats_univar(feature_name, group_col, n_bin, plot_trte)
+    #     fig = plotutil.plot_univar_and_pdp(gp, x=feature_name, y_true='rate_bad', y_pred='score_avg',
+    #                                        group_col=group_col, is_show=False,
+    #                                        title=self.__feature_dict[feature_name])
+    #     return fig
 
-    def report_feature(self, feature_name, group_col: str, n_bin=10, plot_trte=True):
-        """
-        分析单个变量::只看测试集的情况
-        :param feature_name:
-        :param group_col:当前只支持 单维度分组，后续增加多维度分组
-        :param plot_trte : True 表示 plot train+test; False: 只plot test
-        :return: go.Figure
-        """
-        gp = self.__stats_univar(feature_name, group_col, n_bin, plot_trte)
-        fig = plotutil.plot_univar_and_pdp(gp, x=feature_name, y_true='rate_bad', y_pred='score_avg',
-                                           group_col=group_col, is_show=False,
-                                           title=self.__feature_dict[feature_name])
-        return fig
-
-    def report_features(self):
-        """
-        保存所有的特征 univar + pdp 到 html 中
-        保存方式是 dash app 运行
-        :param plot_trte:
-        :return:
-        """
-        figs = []
-        for feature_name in self.__features:
-            fig = self.report_feature(feature_name, None, n_bin=10, plot_trte=True)
-            figs.append(fig)
-        plotutil.show_dash(figs)
+    # def report_features(self):
+    #     """
+    #     保存所有的特征 univar + pdp 到 html 中
+    #     保存方式是 dash app 运行
+    #     :param plot_trte:
+    #     :return:
+    #     """
+    #     figs = []
+    #     for feature_name in self.__features:
+    #         fig = self.report_feature(feature_name, None, n_bin=10, plot_trte=True)
+    #         figs.append(fig)
+    #     plotutil.show_dash(figs)

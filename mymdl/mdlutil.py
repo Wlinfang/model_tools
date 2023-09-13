@@ -79,7 +79,7 @@ def get_bin(df: pd.DataFrame, feature_name: str, cut_type=1,
     if not pd.api.types.is_numeric_dtype(df[feature_name]):
         # 非数字型
         t1['lbl'] = t1[feature_name]
-    if not feature_grid:
+    if feature_grid is None or len(feature_grid) == 0:
         # 如果未指定
         feature_grid = get_feature_grid(df[feature_name], cut_type, n_bin
                                         , default_values)
@@ -312,7 +312,7 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
     if len(np.unique(y_true)) == 1:
         # only one class
         logger.info('only one class !!!')
-        return None, None, None,None
+        return None, None, None, None
     # 返回 精确率，召回率，F1
     fpr, tpr, thr = metrics.roc_curve(y_true, y_pred)
     auc = np.round(metrics.roc_auc_score(y_true, y_pred), 3)
@@ -352,7 +352,7 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
         # uniformtext_minsize 调整标注文字大小；uniformtext_mode 不合规数字隐藏
         fig.update_layout(title=title, uniformtext_minsize=2, uniformtext_mode='hide')
         fig.show()
-    return len(y_true),auc, ks, gini
+    return len(y_true), auc, ks, gini
 
 
 def psi(data_base: Union[list, np.array, pd.Series],
