@@ -397,6 +397,7 @@ def woe(df: pd.DataFrame, x: str, y: str, feature_grid=[], cut_type=1, n_bin=10)
     woe = ln (坏人比例) / (好人比例)
     坏人比例 =  组内的坏人数/ 总坏人数
     好人比例 = 组内的好人数/ 总好人数
+    :param df:
     :param y 二值变量  定义 坏=1  好=0
     """
     # 好人比例 = rate_good_over_allgood
