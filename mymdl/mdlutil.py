@@ -40,7 +40,7 @@ def get_feature_grid(values: Union[list, np.array],
     # 对values 进行排序
     vs_sort = np.sort(values)
     if n <= n_bin:
-        f = [-np.Inf] + vs_sort.tolist()
+        f = [-np.Inf] + list([np.unique(vs_sort.tolist())])
     else:
         if cut_type == 1:
             # 等频
@@ -186,7 +186,6 @@ def univar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
     # 对应的y mean 计算
-    cls_cols = []
     if group_cols is None or len(group_cols) == 0:
         cls_cols = ['lbl', 'lbl_index', 'lbl_left']
     else:

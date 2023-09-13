@@ -178,8 +178,10 @@ class ModelReport:
             return None
         if df_test is None:
             return None
+        if not plot_trte:
+            df_train = None
 
-        feature_name_desc = self.__feature_dict[feature_name]
+        feature_name_desc = self.__feature_dict.get(feature_name, '')
         # 初始化输出值
         gp = pd.DataFrame()
         feature_grid = []
@@ -245,6 +247,7 @@ class ModelReport:
         """
         figs = []
         for feature_name in self.__features:
+            print(feature_name)
             fig = self.report_feature(df_train, df_test, feature_name, group_cols=group_cols, n_bin=n_bin,
                                       plot_trte=plot_trte,
                                       is_show=False, is_save=True)
