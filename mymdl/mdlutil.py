@@ -44,8 +44,8 @@ def get_feature_grid(values: Union[list, np.array],
     # 对values 进行排序
     vs_sort = np.sort(values)
     if n <= n_bin:
-        f = list(np.unique(vs_sort.tolist()))
-        f.append(-np.Inf)
+        f = [-np.Inf]
+        f.extend(list(np.unique(vs_sort.tolist())))
     else:
         if cut_type == 1:
             # 等频
