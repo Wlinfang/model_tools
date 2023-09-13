@@ -235,15 +235,15 @@ class ModelReport:
 
         return gp
 
-    # def report_features(self):
-    #     """
-    #     保存所有的特征 univar + pdp 到 html 中
-    #     保存方式是 dash app 运行
-    #     :param plot_trte:
-    #     :return:
-    #     """
-    #     figs = []
-    #     for feature_name in self.__features:
-    #         fig = self.report_feature(feature_name, None, n_bin=10, plot_trte=True)
-    #         figs.append(fig)
-    #     plotutil.show_dash(figs)
+    def report_features(self,df_train,df_test,plot_trte=True,group_cols=[], n_bin=10):
+        """
+        保存所有的特征 univar + pdp 到 html 中
+        :param plot_trte:
+        :return:
+        """
+        figs = []
+        for feature_name in self.__features:
+            fig = self.report_feature(df_train, df_test, feature_name, group_cols=group_cols, n_bin=n_bin, plot_trte=plot_trte,
+                       is_show=False, is_save=True)
+            figs.append(fig)
+        plotutil.show_dash(figs)

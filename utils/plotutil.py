@@ -5,7 +5,6 @@ import pandas as pd
 from typing import List, Union
 
 import plotly.graph_objects as go
-import plotly.offline
 from plotly.subplots import make_subplots
 import plotly.express as px
 
@@ -103,9 +102,12 @@ def plot_univar_with_bar(df: pd.DataFrame, x: str, y_line: str, y_bar: str,
             gc = gcs[ix]
             color = colors[ix]
             tmp = df[df[group_col] == gc]
-            t1 = go.Bar(x=tmp[x], y=tmp[y_bar], name=y_bar, opacity=0.5,color=color)
-            t2 = go.Scatter(x=tmp[x], y=tmp[y_line], xaxis='x', yaxis='y2', name=y_line,color=color)
-            data.extend([t1,t2])
+            t1 = go.Bar(x=tmp[x], y=tmp[y_bar], name=y_bar, opacity=0.5, marker=dict(color=color),
+                        legendgroup='group')
+            t2 = go.Scatter(x=tmp[x], y=tmp[y_line], xaxis='x',
+                            yaxis='y2', name=y_line, line=dict(color=color),
+                            legendgroup='group',showlegend=False)
+            data.extend([t1, t2])
     layout = go.Layout(
         title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
         xaxis=dict(title=x, tickangle=-15),
