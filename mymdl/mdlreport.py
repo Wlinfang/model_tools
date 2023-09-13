@@ -106,6 +106,8 @@ class ModelReport:
         if plot_trte and df_train is None:
             raise ValueError('df_train is None！！！')
             return None
+        if not plot_trte:
+            df_train = None
         # 模型分预测
         for df in [df_train, df_test]:
             df = self.__predict_proba(df)
@@ -211,13 +213,13 @@ class ModelReport:
                                                     title='::'.join([feature_name, feature_name_desc]),
                                                     is_show=is_show)
                 if is_save:
-                    plotutil.save_fig_tohtml(self.__report_file,fig)
+                    plotutil.save_fig_tohtml(self.__report_file, fig)
                 # pdp
                 fig = plotutil.plot_univar(tmp, x='lbl', y='score_avg', group_col='legend_title',
                                            title='pdp-{}'.format(feature_name),
                                            is_show=is_show)
                 if is_save:
-                    plotutil.save_fig_tohtml(self.__report_file,fig)
+                    plotutil.save_fig_tohtml(self.__report_file, fig)
         else:
             # univar
             fig = plotutil.plot_univar_with_bar(gp, x='lbl', y_line='rate_bad', y_bar='cnt',
@@ -235,7 +237,7 @@ class ModelReport:
 
         return gp
 
-    def report_features(self,df_train,df_test,plot_trte=True,group_cols=[], n_bin=10):
+    def report_features(self, df_train, df_test, plot_trte=True, group_cols=[], n_bin=10):
         """
         保存所有的特征 univar + pdp 到 html 中
         :param plot_trte:
@@ -243,7 +245,8 @@ class ModelReport:
         """
         figs = []
         for feature_name in self.__features:
-            fig = self.report_feature(df_train, df_test, feature_name, group_cols=group_cols, n_bin=n_bin, plot_trte=plot_trte,
-                       is_show=False, is_save=True)
+            fig = self.report_feature(df_train, df_test, feature_name, group_cols=group_cols, n_bin=n_bin,
+                                      plot_trte=plot_trte,
+                                      is_show=False, is_save=True)
             figs.append(fig)
         plotutil.show_dash(figs)
