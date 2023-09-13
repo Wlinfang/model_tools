@@ -181,7 +181,7 @@ def univar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     :param feature_grid cut_type n_bin
     :param group_cols 分组统计
     """
-    if df is None or len(df)==0:
+    if df is None or len(df) == 0:
         return None
     # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
@@ -319,7 +319,7 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
     ks_max_x = ks[ks_max_index]
     # roc 图，ks 图
     # x=fpr;;; y = tpr  ks
-    gini = 2 * auc - 1
+    gini = np.round(2 * auc - 1, 3)
     if is_show:
         data = [
             # roc-auc 图
