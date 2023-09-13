@@ -164,7 +164,7 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, title='', group_col=None, is_show
 
 def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
                  title='', f1_title='', f2_title='',
-                 group_col=None,
+                 group_col=None,hovertext=None,
                  is_show=True) -> go.Figure:
     """
     适用于 子图(x1,y1) 子图(x2,y2) 一行2个子图的情况，2个子图均为折线图
@@ -201,17 +201,17 @@ def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
             fig.add_trace(
                 go.Scatter(x=tmp[x1], y=tmp[y1],
                            legendgroup='group', name=gc,
-                           hovertext=gc, line=dict(color=color)),
+                           hovertext=hovertext, line=dict(color=color)),
                 row=1, col=1
             )
             # lift 图
             fig.add_trace(
                 go.Scatter(x=tmp[x2], y=tmp[y2], legendgroup='group',
-                           showlegend=False, hovertext=gc, line=dict(color=color)),
+                           showlegend=False, hovertext=hovertext, line=dict(color=color)),
                 row=1, col=2
             )
     fig.update_yaxes(
-        matches=None
+        matches=None,
     )
     fig.update_layout(
         title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
@@ -222,6 +222,8 @@ def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
         xaxis=dict(tickangle=-30),
         # 第二个子图的横坐标轴
         xaxis2=dict(tickangle=-30),
+        yaxis=dict(title=y1),
+        yaxis2=dict(title=y2)
     )
     if is_show:
         fig.show()
@@ -236,8 +238,6 @@ def save_fig_tohtml(file_name: str, fig: go.Figure):
     :return:
     """
     # 判断文件名为 .html
-    if not os.path.isfile(file_name):
-        raise ValueError(f'{file_name} is error')
     if os.path.splitext(file_name)[-1] != '.html':
         raise ValueError(f'{file_name} must be a html ')
 

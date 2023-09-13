@@ -177,7 +177,8 @@ class ModelReport:
         gp = gp.merge(gp_auc[['group_cols_str', 'sample_type', 'auc_title']], on=['group_cols_str', 'sample_type'],
                       how='left')
         # 生成图例
-        gp['legend_title'] = gp[['sample_type', 'group_cols_str', 'auc_title']].fillna('').apply(lambda x: '::'.join(x), axis=1)
+        gp['legend_title'] = gp[['sample_type', 'group_cols_str', 'auc_title']].fillna('').apply(lambda x: '::'.join(x),
+                                                                                                 axis=1)
         n = gp['group_cols_str'].nunique()
         m = gp['sample_type'].nunique()
         if m > 1 and n > 1:
@@ -185,12 +186,13 @@ class ModelReport:
             for gcs in gp['group_cols_str'].unique():
                 fig = plotutil.plot_liftvar(gp[gp['group_cols_str'] == gcs], x1='lbl', y1='rate_bad', x2='lbl',
                                             y2='accum_lift_bad',
-                                            title=gcs, group_col='legend_title', is_show=is_show)
+                                            title=gcs, group_col='legend_title', hovertext=['cnt', 'cnt_bad'],
+                                            is_show=is_show)
                 if is_save:
                     plotutil.save_fig_tohtml(self.__report_file, fig)
         else:
             fig = plotutil.plot_liftvar(gp, x1='lbl', y1='rate_bad', x2='lbl', y2='accum_lift_bad',
-                                        group_col='legend_title', is_show=is_show)
+                                        group_col='legend_title', hovertext=['cnt', 'cnt_bad'], is_show=is_show)
             plotutil.save_fig_tohtml(self.__report_file, fig)
 
         return gp
