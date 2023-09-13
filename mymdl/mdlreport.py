@@ -252,4 +252,3 @@ class ModelReport:
                                       plot_trte=plot_trte,
                                       is_show=False, is_save=True)
             figs.append(fig)
-        plotutil.show_dash(figs)
