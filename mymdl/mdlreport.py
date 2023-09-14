@@ -216,16 +216,12 @@ class ModelReport:
                                                     is_show=is_show)
                 if is_save:
                     plotutil.save_fig_tohtml(self.__report_file, fig)
-                if is_show:
-                    fig.show()
                 # pdp
                 fig = plotutil.plot_univar(tmp, x='lbl', y='score_avg', group_col='legend_title',
                                            title='pdp-{}'.format(feature_name),
                                            is_show=is_show)
                 if is_save:
                     plotutil.save_fig_tohtml(self.__report_file, fig)
-                if is_show:
-                    fig.show()
         else:
             # univar
             fig = plotutil.plot_univar_with_bar(gp, x='lbl', y_line='rate_bad', y_bar='cnt',
@@ -234,16 +230,12 @@ class ModelReport:
                                                 is_show=is_show)
             if is_save:
                 plotutil.save_fig_tohtml(self.__report_file, fig)
-            if is_show:
-                fig.show()
             # pdp
             fig = plotutil.plot_univar(gp, x='lbl', y='score_avg', group_col='legend_title',
                                        title='pdp-{}'.format(feature_name),
                                        is_show=is_show)
             if is_save:
                 plotutil.save_fig_tohtml(self.__report_file, fig)
-            if is_show:
-                fig.show()
 
         return gp
 
