@@ -213,6 +213,8 @@ def accumvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     :param feature_grid cut_type n_bin
     :param group_cols 分组统计
     """
+    if df is None:
+        return None
     # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
     cls_cols = group_cols
@@ -226,8 +228,7 @@ def accumvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
                         fill_value=0, margins=False, observed=True)
     gp.columns = ['cnt', 'sum']
     gp['avg'] = np.round(gp['sum'] / gp['cnt'], 3)
-    print(group_cols)
-    if len(group_cols) == 0:
+    if group_cols is None or len(group_cols) == 0:
         gp['accum_cnt'] = gp['cnt'].cumsum()
         gp['accum_sum'] = gp['sum'].cumsum()
         gp['accum_avg'] = np.round(gp['accum_sum'] / gp['accum_cnt'], 3)
@@ -235,6 +236,7 @@ def accumvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
         gp['accum_cnt'] = gp.groupby(group_cols)['cnt'].cumsum()
         gp['accum_sum'] = gp.groupby(group_cols)['sum'].cumsum()
         gp['accum_avg'] = np.round(gp['accum_sum'] / gp['accum_cnt'], 3)
+    gp=gp.reset_index()
     return gp
 
 
@@ -246,6 +248,8 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     :param group_cols 分组统计
     :param feature_grid cut_type[1:等频分布 2:等宽分布] n_bin 分组的参数
     """
+    if df is None:
+        return None
     # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
     cls_cols = group_cols
@@ -258,23 +262,24 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     # 分组对y 进行计算
     gp = pd.pivot_table(df, values=y, index=cls_cols,
                         sort='lbl_index', aggfunc=['count', 'sum'],
-                        fill_value=0, margins=True, observed=True)
+                        fill_value=0, margins=False, observed=True)
     gp.columns = ['cnt', 'cnt_bad']
     gp['cnt_good'] = gp['cnt'] - gp['cnt_bad']
     gp['rate_bad'] = np.round(gp['cnt_bad'] / gp['cnt'], 3)
+
     if group_cols is None or len(group_cols) == 0:
         # 累计
         gp['accum_cnt_bad'] = gp['cnt_bad'].cumsum()
         gp['accum_cnt_good'] = gp['cnt_good'].cumsum()
-        gp.loc['All', 'accum_cnt_bad'] = None
-        gp.loc['All', 'accum_cnt_good'] = None
 
         # 坏样本占整体坏样本比例
-        gp['accum_rate_bad_over_allbad'] = np.round(gp['accum_cnt_bad'] / gp.loc['All', 'cnt_bad'].values[0], 3)
+        gp['accum_rate_bad_over_allbad'] = np.round(gp['accum_cnt_bad'] / gp['cnt_bad'].sum(), 3)
         # 好样本占整体好样本比例
-        gp['accum_rate_good_over_allgood'] = np.round(gp['accum_cnt_good'] / gp.loc['All', 'cnt_good'].values[0], 3)
+        gp['accum_rate_good_over_allgood'] = np.round(gp['accum_cnt_good'] / gp['cnt_good'].sum(), 3)
         # lift = bad_over_allbad_rate / bad_rate
-        gp['accum_lift_bad'] = np.round(gp['accum_rate_bad_over_allbad'] / gp.loc['All', 'rate_bad'].values[0], 3)
+        # 整体bad_rate
+        all_bad_rate = np.round(gp['cnt_bad'].sum()/gp['cnt'].sum(),4)
+        gp['accum_lift_bad'] = np.round(gp['accum_rate_bad_over_allbad'] / all_bad_rate, 3)
     else:
         gp['accum_cnt_bad'] = gp.groupby(group_cols)['cnt_bad'].cumsum()
         gp['accum_cnt_good'] = gp.groupby(group_cols)['cnt_good'].cumsum()
