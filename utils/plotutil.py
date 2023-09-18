@@ -192,6 +192,33 @@ def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
     return fig
 
 
+def plot_corr_heatmap(df,feature_cols)->pd.DataFrame:
+    """
+    相关性矩阵热力图
+    :param df: pd.dataframe
+    :param feature_cols: list
+    """
+    if df is None:
+        return None
+    df_corr = df[feature_cols].corr()
+    # 下三角
+    mask = np.triu(np.ones_like(df_corr, dtype=bool))
+    # 将上三角置为空
+    df_corr = df_corr.mask(mask)
+
+    x = list(df_corr.columns)
+    y = list(df_corr.index)
+    z = np.round(np.array(df_corr), decimals=2)
+    fig = px.imshow(z, x=x, y=y, zmin=-1, zmax=1,
+                    color_continuous_scale='RdBu', aspect="auto")
+    fig.update_traces(text=z, texttemplate="%{text}")
+    fig.update_xaxes(side="bottom")
+    fig.show()
+    return df_corr
+
+
+
+
 def save_fig_tohtml(file_name: str, fig: go.Figure):
     """
     将图片保存到 file_name 中，append 追加形式保存
