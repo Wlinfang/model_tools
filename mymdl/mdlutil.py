@@ -7,12 +7,13 @@ import plotly.graph_objects as go
 
 from model_tools.utils.toolutil import del_none
 import logging
+
 logger = logging.getLogger(__file__)
 
 pd.set_option('display.float_format', lambda x: '%.3f' % x)
-pd.set_option('display.precision',3)
-pd.set_option('display.max_rows',2000)
-pd.set_option('display.max_columns',2000)
+pd.set_option('display.precision', 3)
+pd.set_option('display.max_rows', 2000)
+pd.set_option('display.max_columns', 2000)
 
 
 def get_feature_grid(values: Union[list, np.array],
@@ -236,7 +237,7 @@ def accumvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
         gp['accum_cnt'] = gp.groupby(group_cols)['cnt'].cumsum()
         gp['accum_sum'] = gp.groupby(group_cols)['sum'].cumsum()
         gp['accum_avg'] = np.round(gp['accum_sum'] / gp['accum_cnt'], 3)
-    gp=gp.reset_index()
+    gp = gp.reset_index()
     return gp
 
 
@@ -278,7 +279,7 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
         gp['accum_rate_good_over_allgood'] = np.round(gp['accum_cnt_good'] / gp['cnt_good'].sum(), 3)
         # lift = bad_over_allbad_rate / bad_rate
         # 整体bad_rate
-        all_bad_rate = np.round(gp['cnt_bad'].sum()/gp['cnt'].sum(),4)
+        all_bad_rate = np.round(gp['cnt_bad'].sum() / gp['cnt'].sum(), 4)
         gp['accum_lift_bad'] = np.round(gp['accum_rate_bad_over_allbad'] / all_bad_rate, 3)
     else:
         gp['accum_cnt_bad'] = gp.groupby(group_cols)['cnt_bad'].cumsum()
@@ -463,6 +464,39 @@ def iv(df: pd.DataFrame, x: str, y: str, feature_grid=[], cut_type=1, n_bin=10):
     return np.round(np.sum(gp['iv_bin']), 2)
 
 
+def filter_corr(df, feature_cols, threold):
+    """
+    筛选高相关性的特征
+    :param df:
+    :param feature_cols:
+    :param threold: (0~1)
+    :return:
+    """
+    if df is None:
+        return None
+    if threold > 1 or threold < 0:
+        return None
+    df_corr = df[feature_cols].corr()
+    # 下三角
+    mask = np.triu(np.ones_like(df_corr, dtype=bool))
+    # 将上三角置为空
+    df_corr = df_corr.mask(mask)
+    mask = np.array((df_corr < threold) | ((df_corr > -threold) & (df_corr < 0)))
+    df_corr = df_corr.mask(mask)
+    data = []
+    for f in df_corr.columns:
+        t = df_corr[f]
+        t = t[t.notna()]
+        t = t.reset_index()
+        t.columns = ['f1', 'corr']
+        t['f2'] = f
+        data.append(t)
+    df_corr = pd.concat(data)
+    df_corr.sort_values(['f1', 'corr'], ascending=True, inplace=True)
+    cols = ['f1', 'f2', 'corr']
+    return df_corr[cols]
+
+
 class Confidence:
     """
     假设估计置信度区间计算
@@ -475,7 +509,7 @@ class Confidence:
         self.confidence = confidence
         self.is_biased_estimate = is_biased_estimate
 
-    def check_norm_confidence(self,df, feature_name):
+    def check_norm_confidence(self, df, feature_name):
         '''
         计算正太分布的置信区间
         confidence:置信度
@@ -490,7 +524,7 @@ class Confidence:
             sample_std = df[feature_name].std(ddof=1)
         return stats.norm.interval(self.confidence, loc=sample_mean, scale=sample_std)
 
-    def check_t_confidence(self,df, feature_name):
+    def check_t_confidence(self, df, feature_name):
         '''
         计算t分布的置信区间
         '''

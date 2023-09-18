@@ -65,7 +65,7 @@ class ModelReport:
         gp_true = gp_true.merge(gp_pred[cls_col + ['score_avg']], on=cls_col, how='left')
         return gp_true
 
-    def __stats_liftvar(self, df, group_cols=[], n_bin=10, feature_grid=[]):
+    def __stats_liftvar(self, df, feature_name, group_cols=[], n_bin=10, feature_grid=[]):
         """
         统计数据集 df 的lift 表现
         :param df:
@@ -73,20 +73,20 @@ class ModelReport:
         """
         if df is None:
             return None, None
-        gp = mdlutil.liftvar(df, self.__pred, self.__label, feature_grid=feature_grid, cut_type=1, n_bin=n_bin,
+        gp = mdlutil.liftvar(df, feature_name, self.__label, feature_grid=feature_grid, cut_type=1, n_bin=n_bin,
                              group_cols=group_cols)
         gp = gp.reset_index()
         # 分组计算 auc,ks,gini
         if group_cols is not None and len(group_cols) > 0:
             gp_auc = df.groupby(group_cols).apply(
-                lambda x: mdlutil.evaluate_binary_classier(x[self.__label], x[self.__pred], is_show=False))
+                lambda x: mdlutil.evaluate_binary_classier(x[self.__label], x[feature_name], is_show=False))
             gp_auc = gp_auc.reset_index().rename(columns={0: 'value'})
             gp_auc.loc[:, ['cnt', 'auc', 'ks', 'gini']] = gp_auc['value'].apply(pd.Series,
                                                                                 index=['cnt', 'auc', 'ks', 'gini'])
             gp_auc.drop(['value'], axis=1, inplace=True)
             return gp, gp_auc
         else:
-            cnt, auc, ks, gini = mdlutil.evaluate_binary_classier(df[self.__label], df[self.__pred])
+            cnt, auc, ks, gini = mdlutil.evaluate_binary_classier(df[self.__label], df[feature_name])
             gp_auc = pd.DataFrame([[cnt, auc, ks, gini]], columns=['cnt', 'auc', 'ks', 'gini'], index=['all'])
         return gp, gp_auc
 
@@ -120,7 +120,7 @@ class ModelReport:
         gp_auc = pd.DataFrame()
         # train test
         for df, sample_type in zip([df_train, df_test], ['train', 'test']):
-            tmp, tmp_auc = self.__stats_liftvar(df, group_cols=group_cols, n_bin=n_bin,
+            tmp, tmp_auc = self.__stats_liftvar(df, self.__pred, group_cols=group_cols, n_bin=n_bin,
                                                 feature_grid=feature_grid)
             if tmp is not None and len(tmp) > 0:
                 tmp['sample_type'] = sample_type
@@ -161,7 +161,8 @@ class ModelReport:
                                         group_col='legend_title',
                                         title='liftchart',
                                         is_show=is_show)
-            plotutil.save_fig_tohtml(self.__report_file, fig)
+            if is_save:
+                plotutil.save_fig_tohtml(self.__report_file, fig)
 
         return gp
 
@@ -252,3 +253,67 @@ class ModelReport:
                                       plot_trte=plot_trte,
                                       is_show=False, is_save=True)
             figs.append(fig)
+
+    def report_feature_liftchart(self, df_test, feature_names: list, group_cols=[], n_bin=10,
+                                 is_show=False, is_save=False):
+        """
+        融合分&组成各个融合分的子分的表现
+        :return:
+        """
+        # x:不同的分，分组区间不一致
+        # 融合分预测
+        df_test = self.__predict_proba(df_test)
+        data_gp = []
+        data_auc = []
+        for f in [self.__pred] + feature_names:
+            # liftchart
+            gp_pred, gp_pred_auc = self.__stats_liftvar(df_test, self.__pred, group_cols, n_bin=n_bin)
+            if gp_pred:
+                gp_pred['feature_name'] = f
+                # group_cols + auc,ks,gini,cnt,feature_name
+                gp_pred_auc['feature_name'] = f
+                data_gp.append(gp_pred)
+                data_auc.append(gp_pred_auc)
+        gp = pd.concat(data_gp)
+        gp_auc = pd.concat(data_auc)
+
+        # 如果分组的情况
+        if group_cols is not None and len(group_cols) > 0:
+            gp[group_cols] = gp[group_cols].astype(str)
+            gp['group_cols_str'] = gp[group_cols].apply(lambda x: ':'.join(x), axis=1)
+            gp_auc[group_cols] = gp_auc[group_cols].astype(str)
+            gp_auc['group_cols_str'] = gp_auc[group_cols].apply(lambda x: ':'.join(x), axis=1)
+        else:
+            gp['group_cols_str'] = ''
+            gp_auc['group_cols_str'] = ''
+        # 合并 gp,gp_auc
+        gp_auc['auc_title'] = gp_auc.apply(
+            lambda x: 'cnt:{} auc:{} ks:{}'.format(x['cnt'], x['auc'], x['ks']), axis=1)
+        gp = gp.merge(gp_auc[['feature_name', 'group_cols_str', 'auc_title']], on=['feature_name', 'group_cols_str'],
+                      how='left')
+        # 生成图例
+        gp['legend_title'] = gp[['feature_name', 'group_cols_str', 'auc_title']].fillna('').apply(
+            lambda x: '::'.join(x),
+            axis=1)
+
+        n = gp['group_cols_str'].nunique()
+        if n > 1:
+            # 多数据集+多维组合
+            for gcs in gp['group_cols_str'].unique():
+                fig = plotutil.plot_liftvar(gp[gp['group_cols_str'] == gcs],
+                                            x1='lbl_index', y1='rate_bad',
+                                            x2='lbl_index', y2='accum_lift_bad',
+                                            title=gcs, group_col='legend_title',
+                                            is_show=is_show)
+                if is_save:
+                    plotutil.save_fig_tohtml(self.__report_file, fig)
+        else:
+            fig = plotutil.plot_liftvar(gp, x1='lbl_index', y1='rate_bad',
+                                        x2='lbl_index', y2='accum_lift_bad',
+                                        group_col='legend_title',
+                                        title='liftchart',
+                                        is_show=is_show)
+            if is_save:
+                plotutil.save_fig_tohtml(self.__report_file, fig)
+
+        return gp
