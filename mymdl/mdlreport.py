@@ -267,8 +267,8 @@ class ModelReport:
         data_auc = []
         for f in [self.__pred] + feature_names:
             # liftchart
-            gp_pred, gp_pred_auc = self.__stats_liftvar(df_test, self.__pred, group_cols, n_bin=n_bin)
-            if gp_pred:
+            gp_pred, gp_pred_auc = self.__stats_liftvar(df_test, f, group_cols, n_bin=n_bin)
+            if gp_pred is not None:
                 gp_pred['feature_name'] = f
                 # group_cols + auc,ks,gini,cnt,feature_name
                 gp_pred_auc['feature_name'] = f
