@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 from typing import List, Union
-
+import seaborn as sns
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
@@ -192,7 +192,7 @@ def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
     return fig
 
 
-def plot_corr_heatmap(df,feature_cols)->pd.DataFrame:
+def plot_corr_heatmap(df, feature_cols) -> pd.DataFrame:
     """
     相关性矩阵热力图
     :param df: pd.dataframe
@@ -217,6 +217,21 @@ def plot_corr_heatmap(df,feature_cols)->pd.DataFrame:
     return df_corr
 
 
+def plot_scatter_matrix(df, feature_cols, group_feature_name=None):
+    """
+    散点图:特征之间的散点图 seaborn 实现
+    :return:
+    """
+    if len(feature_cols) > 9:
+        print('特征太多了')
+        return
+    # pd.plotting.scatter_matrix(df[feature_cols], color='red',
+    #                            hist_kwds={'bins': 30, 'color': 'red'})
+    sns.set_theme(style="ticks")
+    if pd.isna(group_feature_name):
+        sns.pairplot(df[feature_cols])
+    else:
+        sns.pairplot(df[feature_cols + [group_feature_name]], hue=group_feature_name)
 
 
 def save_fig_tohtml(file_name: str, fig: go.Figure):

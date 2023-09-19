@@ -102,8 +102,14 @@ def logit_fit(df_train, df_val, feature_cols, target,
     lr = LogisticRegressionCV(Cs=Cs, fit_intercept=fit_intercept, cv=kf,
                               penalty=penalty, scoring='roc_auc', max_iter=100,
                               solver='saga', tol=1e-4, class_weight='balanced', refit=True,
-                              random_state=1024, verbose=1)
+                              random_state=1024, verbose=0)
     lr.fit(df_train[feature_cols], df_train[target])
+    # 训练集auc,验证集auc
+    train_proba = lr.predict_proba(df_train[feature_cols])[:, 1]
+    print('AUC Score (Train): %f' %  metrics.roc_auc_score(df_train[target], train_proba))
+    if df_val:
+        val_proba = lr.predict_proba(df_val[feature_cols])[:, 1]
+        print('AUC Score (Validation): %f' % metrics.roc_auc_score(df_val[target], val_proba))
     # c_
     df_c = pd.DataFrame(lr.Cs_, columns=['C'])
     df_c = df_c.reset_index()
