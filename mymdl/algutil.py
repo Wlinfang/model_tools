@@ -90,24 +90,45 @@ def xgboost_fit(df_train, df_val, feature_cols, target, cv_folds=5, max_depth=3,
 def logit_fit(df_train, df_val, feature_cols, target,
               penalty='l2', Cs=10, fit_intercept=True, cv=5):
     """
-    sklearn Logit regression
+    sklearn Logit regression,本code 只在二分类上测试，如果多分类，待验证
     :param feature_cols:
     :param target:
     :param penalty 正则化项， ‘l1’, ‘l2’, None
     :param fit_intercept : 截距；如果X 进行了中心化处理，设置为 False
-    :param Cs : 值越小 正则化越强; 如果为int , list；cv 用于调参
+    :param Cs : 值越小 正则化越强; 如果为int 1e-4~1e4等比10个数字, list；cv 用于调参
     :return:
     """
     kf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=1024)
     lr = LogisticRegressionCV(Cs=Cs, fit_intercept=fit_intercept, cv=kf,
-                              penalty=penalty, scoring='auc', max_iter=500,
+                              penalty=penalty, scoring='roc_auc', max_iter=100,
                               solver='saga', tol=1e-4, class_weight='balanced', refit=True,
                               random_state=1024, verbose=1)
-    lr.fit(df_train[feature_cols], target)
-    # 参数 coef_ c_
-
-    return lr
-
+    lr.fit(df_train[feature_cols], df_train[target])
+    # c_
+    df_c = pd.DataFrame(lr.Cs_, columns=['C'])
+    df_c = df_c.reset_index()
+    df_c = df_c.rename(columns={'index': 'c_name'})
+    df_c['c_name'] = df_c['c_name'].apply(lambda x: 'c' + str(x))
+    # 最优参数
+    data = []
+    for ky in lr.scores_.keys():
+        t = lr.scores_.get(ky)
+        if t.ndim == 2:
+            n_folds, n_cs = t.shape
+            index_names = ['c%d' % i for i in range(0, n_cs, 1)]
+            td = pd.DataFrame(np.mean(t, axis=0), columns=['score'], index=index_names)
+            td = td.reset_index()
+            td.rename(columns={'index': 'c_name'}, inplace=True)
+            td['classes'] = ky
+            data.append(td)
+    df_scores = pd.concat(data)
+    df_scores = df_c.merge(df_scores, on='c_name', how='right')
+    print(df_scores)
+    print(' best params \n')
+    print(' C::', lr.C_, ' intercept::', lr.intercept_, )
+    # 特征 & 系数
+    df_feat = pd.DataFrame(lr.coef_[0], index=lr.feature_names_in_, columns=['coef'])
+    return lr, df_feat
 
 
 def cal_shap_value(alg, df, feature_names, top_num=5, is_show=False):

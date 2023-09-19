@@ -525,7 +525,7 @@ def filter_corr_iv(df, feature_cols, target, corr_threold, iv_threold=0.02) -> T
     return df_corr, df_iv
 
 
-def add_miss_dummy(df, feature_name, fill_value=-999):
+def fill_miss_dummy(df, feature_name, fill_value=-999):
     """
     增加哑变量:如果缺失，则为1，非则为0
     :param feature_name 缺失值填充 fill_value
@@ -536,8 +536,9 @@ def add_miss_dummy(df, feature_name, fill_value=-999):
     if df[df[feature_name].isna()].shape[0] == 0:
         # 无缺失值
         return df
-    df[feature_name + '_miss'] = 0
-    df.loc[df[feature_name].isna(), feature_name + '_miss'] = 1
+    f_n = feature_name + '_miss'
+    df[f_n] = 0
+    df.loc[df[feature_name].isna(), f_n] = 1
     # 填充
     df[feature_name] = df[feature_name].fillna(fill_value)
     return df
