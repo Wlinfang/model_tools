@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
-from typing import Union
+from typing import Union, Tuple
+
+from pandas import DataFrame
 from sklearn import metrics
 from scipy import stats
 import plotly.graph_objects as go
@@ -495,6 +497,32 @@ def filter_corr(df, feature_cols, threold):
     df_corr.sort_values(['f1', 'corr'], ascending=True, inplace=True)
     cols = ['f1', 'f2', 'corr']
     return df_corr[cols]
+
+
+def filter_corr_iv(df, feature_cols, target, corr_threold, iv_threold=0.02) -> Tuple[DataFrame, DataFrame]:
+    """
+    高相关性iv 过滤
+    :param df:
+    :param feature_cols:
+    :param target:目标变量
+    :param corr_threold:相关性阈值 0~1之间
+    :param iv_threold iv 阈值
+    :param df_corr  df_iv
+    """
+    df_corr = filter_corr(df, feature_cols, corr_threold)
+    # 计算iv 值
+    iv_dict = {}
+    for f in feature_cols:
+        iv_value = iv(df, f, target, cut_type=1, n_bin=10)
+        if iv_value < iv_threold:
+            continue
+        iv_dict[f] = iv_value
+    df_iv = pd.DataFrame.from_dict(iv_dict, orient='index', columns=['iv'])
+    df_iv = df_iv.reset_index()
+    # 高相关性的特征剔除
+    df_corr = df_corr.merge(df_iv.rename(columns={'index': 'f1', 'iv': 'f1_iv'}), on='f1', how='left')
+    df_corr = df_corr.merge(df_iv.rename(columns={'index': 'f2', 'iv': 'f2_iv'}), on='f2', how='left')
+    return df_corr, df_iv
 
 
 def add_miss_dummy(df, feature_name, fill_value=-999):
