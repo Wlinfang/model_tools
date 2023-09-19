@@ -497,6 +497,24 @@ def filter_corr(df, feature_cols, threold):
     return df_corr[cols]
 
 
+def add_miss_dummy(df, feature_name, fill_value=-999):
+    """
+    增加哑变量:如果缺失，则为1，非则为0
+    :param feature_name 缺失值填充 fill_value
+    :return:
+    """
+    if df is None:
+        return None
+    if df[df[feature_name].isna()].shape[0] == 0:
+        # 无缺失值
+        return df
+    df[feature_name + '_miss'] = 0
+    df.loc[df[feature_name].isna(), feature_name + '_miss'] = 1
+    # 填充
+    df[feature_name] = df[feature_name].fillna(fill_value)
+    return df
+
+
 class Confidence:
     """
     假设估计置信度区间计算
