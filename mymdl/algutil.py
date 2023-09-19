@@ -2,7 +2,9 @@ import pandas as pd
 import numpy as np
 from sklearn import metrics
 from sklearn import tree
-from xgboost import DMatrix, cv,XGBClassifier
+from xgboost import DMatrix, cv, XGBClassifier
+from sklearn.linear_model import LogisticRegressionCV
+from sklearn.model_selection import StratifiedKFold
 import pydotplus
 import graphviz
 import shap
@@ -83,6 +85,29 @@ def xgboost_fit(df_train, df_val, feature_cols, target, cv_folds=5, max_depth=3,
     feat_imp = feat_imp[feat_imp > 0]
 
     return alg, feat_imp
+
+
+def logit_fit(df_train, df_val, feature_cols, target,
+              penalty='l2', Cs=10, fit_intercept=True, cv=5):
+    """
+    sklearn Logit regression
+    :param feature_cols:
+    :param target:
+    :param penalty 正则化项， ‘l1’, ‘l2’, None
+    :param fit_intercept : 截距；如果X 进行了中心化处理，设置为 False
+    :param Cs : 值越小 正则化越强; 如果为int , list；cv 用于调参
+    :return:
+    """
+    kf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=1024)
+    lr = LogisticRegressionCV(Cs=Cs, fit_intercept=fit_intercept, cv=kf,
+                              penalty=penalty, scoring='auc', max_iter=500,
+                              solver='saga', tol=1e-4, class_weight='balanced', refit=True,
+                              random_state=1024, verbose=1)
+    lr.fit(df_train[feature_cols], target)
+    # 参数 coef_ c_
+
+    return lr
+
 
 
 def cal_shap_value(alg, df, feature_names, top_num=5, is_show=False):
