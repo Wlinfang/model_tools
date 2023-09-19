@@ -306,6 +306,41 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     return gp
 
 
+def evaluate_twoscores_lift(df, f1, f2, target, n_bin=10):
+    """
+    评估2个模型分的联合的lift 变化
+    :param f1 f2 ::: feature_name
+    :param target:
+    :param n_bin:
+    :return:
+    """
+    cols = [target, f1, f2]
+    df = df[cols]
+    df = get_bin(df, f1, cut_type=1, n_bin=n_bin)
+    df.rename(columns={'lbl': '%s_lbl' % f1, 'lbl_index': '%s_lbl_index' % f1}, inplace=True)
+    df = get_bin(df, f2, cut_type=1, n_bin=n_bin)
+    df.rename(columns={'lbl': '%s_lbl' % f2, 'lbl_index': '%s_lbl_index' % f2}, inplace=True)
+    ix = '%s_lbl' % f1
+    column = '%s_lbl' % f2
+    gp = pd.pivot_table(df, values=[target], index=ix,
+                        columns=column, fill_value=0,
+                        aggfunc=('count', 'sum', 'mean'), observed=True, )
+    # 累计所有坏的
+    t_bad = gp[(target, 'sum')].cumsum(axis=1).cumsum(axis=0)
+    all_bad = np.max(t_bad)
+    t_bad = t_bad / all_bad
+    # 整体坏比例
+    all_bad_rate = np.sum(gp[(target, 'sum')], axis=1).sum(axis=0) / np.sum(gp[(target, 'count')],axis=1).sum(axis=0)
+    t_lift = t_bad / all_bad_rate
+    # 设置列名
+    mix = []
+    for c in t_lift.columns.categories:
+        mix.append((target, 'accum_lift_bad', c))
+    t_lift.columns = pd.MultiIndex.from_tuples(mix, names=[None, None, column])
+    gp = gp.join(t_lift)
+
+
+
 def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
                              y_pred: Union[list, pd.Series, np.array],
                              is_show=False):

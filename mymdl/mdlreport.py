@@ -254,7 +254,7 @@ class ModelReport:
                                       is_show=False, is_save=True)
             figs.append(fig)
 
-    def report_feature_liftchart(self, df_test, feature_names: list, group_cols=[], n_bin=10,
+    def report_features_liftchart(self, df_test, feature_names: list, group_cols=[], n_bin=10,
                                  is_show=False, is_save=False):
         """
         融合分&组成各个融合分的子分的表现
@@ -317,3 +317,9 @@ class ModelReport:
                 plotutil.save_fig_tohtml(self.__report_file, fig)
 
         return gp
+
+    def report_feature_liftchart(self,df_test):
+        """
+        :param df_test:
+        :return:
+        """
