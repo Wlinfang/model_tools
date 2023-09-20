@@ -559,7 +559,7 @@ def filter_corr(df, feature_cols, threold):
     return df_corr[cols]
 
 
-def filter_corr_iv(df, feature_cols, target, corr_threold, iv_threold=0.02) -> Tuple[DataFrame, DataFrame]:
+def filter_corr_iv(df, feature_cols, target, corr_threold=0.8, iv_threold=0.02) -> Tuple[DataFrame, DataFrame]:
     """
     高相关性iv 过滤
     :param df:

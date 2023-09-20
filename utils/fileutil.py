@@ -5,7 +5,9 @@ from ruamel import yaml
 from docx import Document
 import configparser
 import pickle
-
+# PMML方式保存和读取模型
+from sklearn2pmml import sklearn2pmml, PMMLPipeline
+from pypmml import Model
 
 def save_model_as_pkl(model, path):
     """
@@ -30,13 +32,9 @@ def load_model_from_pkl(path):
 
 
 
-# PMML方式保存和读取模型
-from sklearn2pmml import sklearn2pmml, PMMLPipeline
-from sklearn_pandas import DataFrameMapper
-from pypmml import Model
 
 
-def save_model_as_pmml(x, y, save_file_path):
+def save_model_as_pmml(alg, save_file_path):
     """
     # 以xgb模型为例，方式1：
     # sklearn接口的xgboost，可使用sklearn2pmml生成pmml文件
@@ -45,15 +43,14 @@ def save_model_as_pmml(x, y, save_file_path):
     :param y: 训练数据标签
     :param save_file_path: 保存的目标路径
     """
-    # 设置pmml的pipeline
-    xgb = XGBClassifier(random_state=88)
-    mapper = DataFrameMapper([([i], None) for i in x.columns])
-    pipeline = PMMLPipeline([('mapper', mapper), ('classifier', xgb)])
-    # 模型训练
-    pipeline.fit(x, y)
+    # # 设置pmml的pipeline
+    # xgb = XGBClassifier(random_state=88)
+    # mapper = DataFrameMapper([([i], None) for i in x.columns])
+    # pipeline = PMMLPipeline([('mapper', mapper), ('classifier', xgb)])
+    # # 模型训练
+    # pipeline.fit(x, y)
     # 模型结果保存
-    sklearn2pmml(pipeline, pmml=save_file_path, with_repr=True)
-
+    sklearn2pmml(alg, pmml=save_file_path, with_repr=True)
 
 
 def load_model_from_pmml(load_file_path):
@@ -64,7 +61,6 @@ def load_model_from_pmml(load_file_path):
     """
     model = Model.fromFile(load_file_path)
     return model
-
 
 
 def read_dict_conf(file_path: str) -> dict:
@@ -100,6 +96,7 @@ def read_dict_conf(file_path: str) -> dict:
                 # 如果是 float int str  list 形式
                 conf_dict[part][item] = cp.get(part, item)
     return conf_dict
+
 
 def generate_yaml_doc_ruamel(data: (dict, json), yaml_file: str):
     """
