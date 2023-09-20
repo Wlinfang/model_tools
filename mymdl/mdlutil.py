@@ -306,12 +306,12 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     return gp
 
 
-def evaluate_twoscores_lift(df, f1, f2, target, n_bin=10):
+def evaluate_twoscores_lift(df, f1, f2, target, n_bin=10, show_flat=True):
     """
     评估2个模型分的联合的lift 变化
     :param f1 f2 ::: feature_name
     :param target:
-    :param n_bin:
+    :param show_flat 数据展示模型，True 展开；False 堆叠
     :return:
     """
     cols = [target, f1, f2]
@@ -330,21 +330,40 @@ def evaluate_twoscores_lift(df, f1, f2, target, n_bin=10):
     all_cnt = df.shape[0]
     all_bad_cnt = df[target].sum()
     all_bad_rate = np.round(all_bad_cnt / all_cnt, 3)
+    # 分组数量计算
+    t_cnt = gp['count']
+    t_cnt = t_cnt.stack().reset_index().rename(columns={0: 'cnt'})
+    # 每组坏比例
+    t_bad_rate = gp['mean']
+    t_bad_rate = t_bad_rate.stack().reset_index().rename(columns={0: 'rate_bad'})
+    gp_out = t_cnt.merge(t_bad_rate, on=[ix, column], how='outer')
     # 累计总量
-    t_accum_cnt = gp[(target, 'count')].cumsum(axis=1).cumsum(axis=0)
+    t_accum_cnt = gp['count'].cumsum(axis=1).cumsum(axis=0)
     # 累计总量占比
     t_accum_rate = np.round(t_accum_cnt / all_cnt, 2)
+    t_accum_rate = t_accum_rate.stack().reset_index().rename(columns={0: 'accum_cnt_rate'})
+    gp_out = gp_out.merge(t_accum_rate, on=[ix, column], how='outer')
     # 累计所有坏的比例
-    t_accum_bad = gp[(target, 'sum')].cumsum(axis=1).cumsum(axis=0)
+    t_accum_bad = gp['sum'].cumsum(axis=1).cumsum(axis=0)
     t_accum_bad = t_accum_bad / all_bad_cnt
     # lift
     t_accum_bad = t_accum_bad / all_bad_rate
-    # 设置列名
-    mix = []
-    for c in t_accum_bad.columns.categories:
-        mix.append(('accum_lift_bad', c))
-    t_accum_bad.columns = pd.MultiIndex.from_tuples(mix, names=[None, column])
-    gp = gp.join(t_accum_bad)
+    t_accum_bad = t_accum_bad.stack().reset_index().rename(columns={0: 'accum_lift_bad'})
+    gp_out = gp_out.merge(t_accum_bad, on=[ix, column], how='outer')
+    # # 设置列名
+    # mix = []
+    # for c in t_accum_bad.columns.categories:
+    #     mix.append(('accum_lift_bad', c))
+    # t_accum_bad.columns = pd.MultiIndex.from_tuples(mix, names=[None, column])
+    if not show_flat:
+        # 堆叠模式
+        gp_out = gp_out.set_index([ix, column])
+        gp_out = gp_out.stack().reset_index().rename(columns={'level_2': 'key', 0: 'value'})
+        gp_out = pd.pivot_table(gp_out, values=['value'], index=ix,
+                           columns=[column, 'key'],
+                           aggfunc=np.mean, sort=False)
+        gp_out = gp_out['value']
+    return gp_out
 
 
 def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
