@@ -49,6 +49,17 @@ def check_contain_chinese(check_str):
     return True
 
 
+def parse_date(df, date_name):
+    """
+    对date_name 转化为日期格式 yyyy-mm-dd
+    :param df:
+    :param date_name:
+    :return:
+    """
+    df[date_name] = pd.to_datetime(df[date_name], format='%Y-%m-%d', exact=False)
+    return df
+
+
 def parse_timestamp(df: pd.DataFrame, date_name: str, date_name_new: str):
     """
     日期转时间戳
@@ -109,5 +120,5 @@ def del_none(values: Union[list, np.array, pd.Series]) -> np.array:
         values = values[~np.isnan(values)]
     except ValueError as e:
         # 非数字类型，不进行剔除
-        logger.info('%s is %s', (values,e))
+        logger.info('%s is %s', (values, e))
     return values
