@@ -325,20 +325,26 @@ def evaluate_twoscores_lift(df, f1, f2, target, n_bin=10):
     gp = pd.pivot_table(df, values=[target], index=ix,
                         columns=column, fill_value=0,
                         aggfunc=('count', 'sum', 'mean'), observed=True, )
-    # 累计所有坏的
-    t_bad = gp[(target, 'sum')].cumsum(axis=1).cumsum(axis=0)
-    all_bad = np.max(t_bad)
-    t_bad = t_bad / all_bad
-    # 整体坏比例
-    all_bad_rate = np.sum(gp[(target, 'sum')], axis=1).sum(axis=0) / np.sum(gp[(target, 'count')],axis=1).sum(axis=0)
-    t_lift = t_bad / all_bad_rate
+    gp = gp[target]
+    # 所有的数量
+    all_cnt = df.shape[0]
+    all_bad_cnt = df[target].sum()
+    all_bad_rate = np.round(all_bad_cnt / all_cnt, 3)
+    # 累计总量
+    t_accum_cnt = gp[(target, 'count')].cumsum(axis=1).cumsum(axis=0)
+    # 累计总量占比
+    t_accum_rate = np.round(t_accum_cnt / all_cnt, 2)
+    # 累计所有坏的比例
+    t_accum_bad = gp[(target, 'sum')].cumsum(axis=1).cumsum(axis=0)
+    t_accum_bad = t_accum_bad / all_bad_cnt
+    # lift
+    t_accum_bad = t_accum_bad / all_bad_rate
     # 设置列名
     mix = []
-    for c in t_lift.columns.categories:
-        mix.append((target, 'accum_lift_bad', c))
-    t_lift.columns = pd.MultiIndex.from_tuples(mix, names=[None, None, column])
-    gp = gp.join(t_lift)
-
+    for c in t_accum_bad.columns.categories:
+        mix.append(('accum_lift_bad', c))
+    t_accum_bad.columns = pd.MultiIndex.from_tuples(mix, names=[None, column])
+    gp = gp.join(t_accum_bad)
 
 
 def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
