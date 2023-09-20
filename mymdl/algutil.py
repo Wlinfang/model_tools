@@ -107,7 +107,7 @@ def logit_fit(df_train, df_val, feature_cols, target,
     # 训练集auc,验证集auc
     train_proba = lr.predict_proba(df_train[feature_cols])[:, 1]
     print('AUC Score (Train): %f' %  metrics.roc_auc_score(df_train[target], train_proba))
-    if df_val:
+    if df_val is not None:
         val_proba = lr.predict_proba(df_val[feature_cols])[:, 1]
         print('AUC Score (Validation): %f' % metrics.roc_auc_score(df_val[target], val_proba))
     # c_
