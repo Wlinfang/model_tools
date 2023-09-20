@@ -1,5 +1,4 @@
 import os
-import sys
 import json
 from ruamel import yaml
 from docx import Document
@@ -8,6 +7,7 @@ import pickle
 # PMML方式保存和读取模型
 from sklearn2pmml import sklearn2pmml, PMMLPipeline
 from pypmml import Model
+
 
 def save_model_as_pkl(model, path):
     """
@@ -29,9 +29,6 @@ def load_model_from_pkl(path):
     with open(path, 'rb') as f:
         model = pickle.load(f)
     return model
-
-
-
 
 
 def save_model_as_pmml(alg, save_file_path):
