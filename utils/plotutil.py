@@ -17,7 +17,7 @@ def plot_bar(df: pd.DataFrame, x: str, y: str,
     :param x:
     :param y:
     :param title:
-    :param group_col:
+    :param group_col_color:分组，不同的线不同的颜色
     :param is_show:
     :return:
     """
@@ -40,41 +40,21 @@ def plot_bar(df: pd.DataFrame, x: str, y: str,
 
 
 def plot_univar(df: pd.DataFrame, x: str, y: str,
-                title='', group_col=None, is_show=False) -> go.Figure:
+                title='', group_col_color=None, is_show=False) -> go.Figure:
     """
     单变量 折线图
     :param df:
     :param x:
     :param y:
-    :param group_cols 分组 column of df
-    :param title:
+    :param group_col_color 分组 column of df
     :param is_show:
     :return:
     """
     df[x] = df[x].astype(str)
-    if pd.isna(group_col) or len(group_col) == 0:
-        data = [
-            go.Scatter(x=df[x], y=df[y], name=y)
-        ]
-        legend = dict(yanchor="top", y=1, xanchor="right", x=1.3)
-    else:
-        data = []
-        for gc in df[group_col].unique():
-            data.append(
-                go.Scatter(x=df[df[group_col] == gc][x], y=df[df[group_col] == gc][y], name=gc)
-            )
-        # 横向图例
-        legend = dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h')
-
-    layout = go.Layout(
-        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
-        legend=legend,
-        xaxis=dict(title=x, tickangle=-45),
-        yaxis=dict(title=y, zeroline=True, ),
-        width=900,
-        height=900 * 0.618
-    )
-    fig = go.Figure(data=data, layout=layout)
+    fig = px.line(df, x=x, y=y, color=group_col_color, markers=True,
+                  symbol=group_col_color, orientation='h', title=title, width=900, height=900 * 0.62)
+    fig.update_layout(legend=dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h'),
+                      xaxis=dict(tickangle=-45), yaxis=dict(zeroline=True))
     if is_show:
         fig.show()
     return fig
