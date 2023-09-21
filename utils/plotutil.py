@@ -39,20 +39,42 @@ def plot_bar(df: pd.DataFrame, x: str, y: str,
     return fig
 
 
+def plot_univar_bygroup(df: pd.DataFrame, x: str, y: str,
+                        title='', line_col_color=None, group_cols=[], is_show=False) -> List[go.Figure]:
+    """
+    各个维度画图
+    :param line_col_color: str 在同一个图上 多个折线区分
+    :param group_cols : list 分为多个图
+    :param is_show:
+    :return:
+    """
+    figs = []
+    if group_cols is None or len(group_cols) == 0:
+        fig = plot_univar(df, x, y, title, line_col_color, is_show)
+        figs.append(fig)
+    else:
+        df['group_cols_str'] = df.apply(lambda x: '::'.join(['{}={}'.format(k, v) for k, v in zip(group_cols, x)]),
+                                        axis=1)
+        group_cols_str = df['group_cols_str'].unique()
+        for gcs in group_cols_str:
+            tmp = df[df.group_cols_str == gcs]
+            fig = plot_univar(tmp, x, y, gcs + ':::' + title, line_col_color=line_col_color, is_show=is_show)
+            figs.append(fig)
+    return figs
+
+
 def plot_univar(df: pd.DataFrame, x: str, y: str,
-                title='', group_col_color=None, is_show=False) -> go.Figure:
+                title='', line_col_color=None, is_show=False) -> go.Figure:
     """
     单变量 折线图
     :param df:
-    :param x:
-    :param y:
-    :param group_col_color 分组 column of df
+    :param line_col_color str 同一个图上多条折线
     :param is_show:
     :return:
     """
     df[x] = df[x].astype(str)
-    fig = px.line(df, x=x, y=y, color=group_col_color, markers=True,
-                  symbol=group_col_color, orientation='h', title=title, width=900, height=900 * 0.62)
+    fig = px.line(df, x=x, y=y, color=line_col_color, markers=True,
+                  symbol=line_col_color, orientation='h', title=title, width=900, height=900 * 0.62)
     fig.update_layout(legend=dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h'),
                       xaxis=dict(tickangle=-45), yaxis=dict(zeroline=True))
     if is_show:

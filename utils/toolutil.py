@@ -56,7 +56,7 @@ def parse_date(df, date_name):
     :param date_name:
     :return:
     """
-    df[date_name] = pd.to_datetime(df[date_name], format='%Y-%m-%d', exact=False)
+    df[date_name] = pd.to_datetime(df[date_name], format='%Y-%m-%d', exact=False).dt.date
     return df
 
 
