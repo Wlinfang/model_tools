@@ -6,6 +6,15 @@ from model_tools.mymdl import metricutil, mdlutil
 import logging
 
 
+def filter_all_miss(df, feature_cols):
+    """
+    剔除样本特征全为空的样本
+    """
+    t = df[feature_cols].isnull().T.all()
+    df = df[~df.index.isin(t[t == True].index)]
+    return df
+
+
 def filter_miss(df, feature_cols, threold=0.9) -> List:
     """
     过滤缺失值超过 threold 的特征
@@ -37,9 +46,7 @@ def filter_freq(df, feature_cols, threold=0.8) -> List:
     gp = mdlutil.describe_df(df, feature_cols)
     gp['freq_rate'] = np.round(gp['freq_count'] / gp['count'], 2)
     drop_cols = gp[gp['freq_rate'] > threold].index.tolist()
-    return set(feature_cols)-set(drop_cols)
-
-
+    return set(feature_cols) - set(drop_cols)
 
 
 def filter_corr(df, feature_cols, threold):
