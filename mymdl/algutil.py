@@ -10,6 +10,29 @@ import graphviz
 import shap
 
 
+def split_train_val(df: pd.DataFrame, split_type=1, split_ratio=0.8, sort_col=None):
+    """
+    将数据集进行切分
+    :param split_type  1：随机切分  2：按照时间切分
+    :param split_ratio  切分比例； 取值范围：(0,1)
+    :param sort_col：如果 split_type=2 根据sort_col 排序然后切分
+    :return: df_train,df_val
+    """
+    dftrain = df.reset_index()
+    # == dftrain 中划分 训练集，验证集
+    if split_type == 1:
+        # 随机分配 train / val
+        train = dftrain.sample(frac=split_ratio, random_state=7)
+        val = dftrain[~dftrain.index.isin(train.index)]
+    elif split_type == 2:
+        # 按时间序列分配 train /val
+        train = dftrain.sort_values(by=sort_col).head(int(len(dftrain) * split_ratio))
+        val = dftrain[~dftrain.index.isin(train.index)]
+    else:
+        raise ValueError('param error or data error')
+    return train, val
+
+
 def build_tree(df, feature_names, target, max_depth=3):
     """
     构建决策回归树
@@ -106,7 +129,7 @@ def logit_fit(df_train, df_val, feature_cols, target,
     lr.fit(df_train[feature_cols], df_train[target])
     # 训练集auc,验证集auc
     train_proba = lr.predict_proba(df_train[feature_cols])[:, 1]
-    print('AUC Score (Train): %f' %  metrics.roc_auc_score(df_train[target], train_proba))
+    print('AUC Score (Train): %f' % metrics.roc_auc_score(df_train[target], train_proba))
     if df_val is not None:
         val_proba = lr.predict_proba(df_val[feature_cols])[:, 1]
         print('AUC Score (Validation): %f' % metrics.roc_auc_score(df_val[target], val_proba))

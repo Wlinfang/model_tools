@@ -13,6 +13,19 @@ class FeatureEngineer:
         self.feature_dict = {}
         self.feature_cols = []
 
+    @classmethod
+    def build_cls(cls, feature_dict, feature_cols):
+        """
+        构造 FeatureEngineer 实例
+        :param feature_dict:
+        :param feature_cols:
+        :return:
+        """
+        instan = cls()
+        instan.feature_dict = feature_dict
+        instan.feature_cols = feature_cols
+        return instan
+
     def update_feature_dict(self, feature_name, feature_desc):
         """
         维护特征字典
@@ -61,4 +74,23 @@ class FeatureEngineer:
         df[feature_name] = np.round(
             (df[feature_fenzi] - df[feature_fenmu]) / df[feature_fenmu], 3)
         self.update_feature_dict(feature_name, feature_desc)
+        return df
+
+    def fill_miss_dummy(self, df, feature_name, fill_value=-999):
+        """
+        增加哑变量:如果缺失，则为1，非则为0
+        :param feature_name 缺失值填充 fill_value
+        :return:
+        """
+        if df is None:
+            return None
+        if df[df[feature_name].isna()].shape[0] == 0:
+            # 无缺失值
+            return df
+        f_n = feature_name + '_miss'
+        df[f_n] = 0
+        df.loc[df[feature_name].isna(), f_n] = 1
+        self.feature_cols.append(f_n)
+        # 填充
+        df[feature_name] = df[feature_name].fillna(fill_value)
         return df
