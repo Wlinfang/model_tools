@@ -149,8 +149,10 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
 
     if group_cols is None or len(group_cols) == 0:
         # 累计
+        gp['accum_cnt'] = gp['cnt'].cumsum()
         gp['accum_cnt_bad'] = gp['cnt_bad'].cumsum()
         gp['accum_cnt_good'] = gp['cnt_good'].cumsum()
+        gp['accum_rate_bad'] = np.round(gp['accum_cnt_bad'] / gp['accum_cnt'], 2)
 
         # 坏样本占整体坏样本比例
         gp['accum_rate_bad_over_allbad'] = np.round(gp['accum_cnt_bad'] / gp['cnt_bad'].sum(), 3)
@@ -161,8 +163,10 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
         all_bad_rate = np.round(gp['cnt_bad'].sum() / gp['cnt'].sum(), 4)
         gp['accum_lift_bad'] = np.round(gp['accum_rate_bad_over_allbad'] / all_bad_rate, 3)
     else:
+        gp['accum_cnt'] = gp.groupby(group_cols)['cnt'].cumsum()
         gp['accum_cnt_bad'] = gp.groupby(group_cols)['cnt_bad'].cumsum()
         gp['accum_cnt_good'] = gp.groupby(group_cols)['cnt_good'].cumsum()
+        gp['accum_rate_bad'] = np.round(gp['accum_cnt_bad'] / gp['accum_cnt'], 2)
         tmp = gp.groupby(group_cols).agg(all_cnt_bad=('cnt_bad', 'sum'),
                                          all_cnt_good=('cnt_good', 'sum')).reset_index()
         tmp['all_rate_bad'] = np.round(tmp['all_cnt_bad'] / (tmp['all_cnt_bad'] + tmp['all_cnt_good']), 3)
@@ -180,7 +184,8 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
         # 删除
         gp.drop(['all_cnt_bad', 'all_cnt_good', 'all_rate_bad'], axis=1, inplace=True)
     gp.reset_index(inplace=True)
-    return gp
+    cols = cls_cols + ['cnt', 'cnt_bad', 'rate_bad', 'accum_cnt', 'accum_cnt_bad', 'accum_rate_bad', 'accum_lift_bad']
+    return gp[cols]
 
 
 def evaluate_twoscores_lift(df, f1, f2, target, n_bin=10, show_flat=True):
@@ -311,37 +316,21 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
         fig.show()
     return len(y_true), auc, ks, gini
 
-
-def evaluate_multi_classier(y_true, y_pred):
+def evaluate_multi_classier(y_true,y_pred):
     """
-    适用于多分类:y_pred:预测类别
-    balanced_accuracy: 1/n * (sum( 预测为类别i 的数量 / 类别为i 的数量))
-    cohen_kappa_score:kappa 指数，评估 实际和预测的一致性，-1~1
-        0~0.2 Slight agreement  0.2~0.4 Fair agreement
-        0.41~0.6 Moderate   0.61~0.8 Substancial
-        0.81~1 almost perfect  <0 no
-    matthews_corrcoef:MCC 适用于 imbalanced  -1 ~ 1
-        0:random predict   1：perfert  -1 inverse preidct
-    :return cnt,balanced_accuracy,cohen_kappa,matthews_corrcoef
+    适用于多分类 y_pred 为预测类别值
+    balanced_accuracy_score ： 1/n (sum( 类别i预测对的数量 / 类别i的数量) )
+    cohen_kappa_score : 判断评估性一致性  -1~1
+         <0 评估随机性   1 perfect   0.8~1 almost perfect
+    matthews_corrcoef: -1~1  值越大，一致性越高
+    :return cnt,balanced_accuracy,cohen_kappa,mcc
     """
-    balanced_accuracy = metrics.balanced_accuracy_score(y_true, y_pred)
-    cohen_kappa = metrics.cohen_kappa_score(y_true, y_pred)
-    # 混淆矩阵，Mi,j  表示 实际类别为i,预测为j 的情况
-    cm = metrics.confusion_matrix(y_true, y_pred, normalize='all')
+    balanced_accuracy = metrics.balanced_accuracy_score(y_true,y_pred,)
+    cohen_kappa= metrics.cohen_kappa_score(y_true,y_pred)
+    cm = metrics.confusion_matrix(y_true,y_pred,normalize='all')
     metrics.ConfusionMatrixDisplay(cm)
-    mcc = metrics.matthews_corrcoef(y_true, y_pred)
-    return len(y_true), balanced_accuracy, cohen_kappa, mcc
-
-def evaluate_regression(y_true,y_pred):
-    """
-    评估回归指标
-    :return cnt,mse,r2
-    """
-    mse = metrics.mean_squared_error(y_true,y_pred)
-    r2 = metrics.r2_score(y_true,y_pred)
-    return len(y_true),mse,r2
-
-
+    mcc = metrics.matthews_corrcoef(y_true,y_pred)
+    return len(y_true),balanced_accuracy,cohen_kappa,mcc
 
 class Confidence:
     """

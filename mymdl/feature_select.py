@@ -15,38 +15,20 @@ def filter_all_miss(df, feature_cols):
     return df
 
 
-def filter_miss(df, feature_cols, threold=0.9) -> List:
+def filter_miss_freq(df, feature_cols, miss_threold=0.9,freq_threold=0.8) -> List:
     """
-    过滤缺失值超过 threold 的特征
+    过滤缺失值超过 miss_threold 的特征
+    过滤众数占比高超过 freq_threold 的特征
     """
     gp = mdlutil.describe_df(df, feature_cols)
     gp['miss_rate_float'] = gp['miss_rate'].str.replace('%', '')
     gp['miss_rate_float'] = gp['miss_rate_float'].astype(float)
     gp['miss_rate_float'] = np.round(gp['miss_rate_float'] / 100, 2)
     # 缺失率高的特征剔除
-    miss_feature_cols = gp[gp['miss_rate_float'] > threold].index.tolist()
-    logging.info('缺失率高的特征数为%s' % len(miss_feature_cols))
-    return list(set(feature_cols) - set(miss_feature_cols))
-
-
-def filter_onevalue(df, feature_cols) -> List:
-    """
-    过滤掉取值1个的特征，返回新的可用的特征列表
-    """
-    gp = mdlutil.describe_df(df, feature_cols)
-    # 剔除取值只有1个的特征
-    nunique_one_feature_cols = gp[gp['nunique'] == 1].index.tolist()
-    return list(set(feature_cols) - set(nunique_one_feature_cols))
-
-
-def filter_freq(df, feature_cols, threold=0.8) -> List:
-    """
-    剔除众数占比高的特征,返回新的特征列表
-    """
-    gp = mdlutil.describe_df(df, feature_cols)
+    miss_feature_cols = gp[gp['miss_rate_float'] > miss_threold].index.tolist()
     gp['freq_rate'] = np.round(gp['freq_count'] / gp['count'], 2)
-    drop_cols = gp[gp['freq_rate'] > threold].index.tolist()
-    return set(feature_cols) - set(drop_cols)
+    drop_cols = gp[gp['freq_rate'] > freq_threold].index.tolist()
+    return list(set(feature_cols) - set(miss_feature_cols)-set(drop_cols))
 
 
 def filter_corr(df, feature_cols, threold):
