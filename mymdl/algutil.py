@@ -51,6 +51,62 @@ def build_tree(df, feature_names, target, max_depth=3):
     ftr_imp = pd.Series(dtr.feature_importances_, feature_names)
     return dtr, graph, ftr_imp
 
+def xgboost_multi_fit(df_train,df_val,feature_cols, target, cv_folds=5, max_depth=3,
+                learning_rate=0.05, n_estimators=500):
+    """
+    适用于多分类
+    :param df_train:
+    :param df_val:
+    :param feature_cols:
+    :param target:
+    :param cv_folds:
+    :param max_depth:
+    :param learning_rate:
+    :param n_estimators:
+    :return:
+    """
+    # 利用cv 进行调参
+    params = {
+        'n_estimators': n_estimators,  # 调参
+        'max_depth': max_depth,
+        'grow_policy': 'lossguide',  # leaf-wise 生长策略
+        'learning_rate': learning_rate,
+        'verbosity': 1,  # 日志输出
+        'objective': 'multi:softprob',
+        'booster': 'gbtree',
+        'gamma': 0.0001,
+        #     'tree_method':'hist',
+        #     'reg_alpha':,# L1
+        #     'reg_lambda':,# L2
+        'random_state': 1024,
+        'eval_metric': 'auc'
+    }
+    alg = XGBClassifier(**params)
+    alg.set_params(num_class=len(np.unique(df_train[target])))
+    xgb_param = alg.get_xgb_params()
+    xgtrain = DMatrix(df_train[feature_cols].values, label=df_train[target].values)
+
+    cvresult = cv(xgb_param, xgtrain, num_boost_round=alg.get_params()['n_estimators'],
+                  nfold=cv_folds, metrics='auc',
+                  early_stopping_rounds=10, verbose_eval=100, seed=1024, shuffle=True)
+    # 更新参数
+    alg.set_params(n_estimators=cvresult.shape[0])
+    alg.set_params(eval_metric='auc')
+    print(cvresult, cvresult.shape)
+
+    #     eval_set=[(df_val[feature_cols],df_val[resp])]
+    #     evallist = [(dtrain, 'train'), (dtest, 'eval')]
+
+    # Fit the algorithm on the data and save the model
+    alg.fit(df_train[feature_cols], df_train[target])
+    print('Model params: -----------')
+    print(alg.n_estimators, alg.max_depth, alg.learning_rate)
+
+    # Print Feature Importance:
+    feat_imp = pd.Series(alg.get_booster().get_fscore(), feature_cols).sort_values(ascending=False, na_position='last')
+    feat_imp = feat_imp[feat_imp > 0]
+
+    return alg, feat_imp
 
 def xgboost_fit(df_train, df_val, feature_cols, target, cv_folds=5, max_depth=3,
                 learning_rate=0.05, n_estimators=500):

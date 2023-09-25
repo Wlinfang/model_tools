@@ -232,19 +232,17 @@ def evaluate_twoscores_lift(df, f1, f2, target, n_bin=10, show_flat=True):
     t_accum_bad = t_accum_bad / all_bad_rate
     t_accum_bad = t_accum_bad.stack().reset_index().rename(columns={0: 'accum_lift_bad'})
     gp_out = gp_out.merge(t_accum_bad, on=[ix, column], how='outer')
-    # # 设置列名
-    # mix = []
-    # for c in t_accum_bad.columns.categories:
-    #     mix.append(('accum_lift_bad', c))
-    # t_accum_bad.columns = pd.MultiIndex.from_tuples(mix, names=[None, column])
     if not show_flat:
         # 堆叠模式
-        gp_out = gp_out.set_index([ix, column])
-        gp_out = gp_out.stack().reset_index().rename(columns={'level_2': 'key', 0: 'value'})
-        gp_out = pd.pivot_table(gp_out, values=['value'], index=ix,
-                                columns=[column, 'key'],
-                                aggfunc=np.mean, sort=False)
-        gp_out = gp_out['value']
+        # gp_out = gp_out.set_index([ix, column])
+        # gp_out = gp_out.stack().reset_index().rename(columns={'level_2': 'key', 0: 'value'})
+        # gp_out = pd.pivot_table(gp_out, values=['value'], index=ix,
+        #                         columns=[column, 'key'],
+        #                         aggfunc=np.mean, sort=False)
+        # gp_out = gp_out['value']
+        gp_out=pd.pivot_table(gp_out, values=['cnt', 'rate_bad', 'accum_cnt_rate', 'accum_lift_bad'], index=ix,
+                       columns=column,
+                       aggfunc=np.mean, sort=False)
     return gp_out
 
 

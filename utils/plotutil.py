@@ -7,6 +7,7 @@ import seaborn as sns
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
+from model_tools.mymdl import mdlutil
 
 
 def plot_hists(df, x, bar_col_color=None, n_bins=20) -> go.Figure:
@@ -199,6 +200,100 @@ def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
     if is_show:
         fig.show()
     return fig
+
+
+def plot_score_liftvar(df, x_score: str, target, group_cols=[], n_bin=10, feature_grid=[], is_show=False):
+    """
+    分组lift
+    数据为明细数据
+    :return fig,gp_lift
+    """
+    gp = mdlutil.liftvar(df, x=x_score, y=target, group_cols=group_cols, n_bin=n_bin, feature_grid=feature_grid)
+    # 分组计算 auc,ks,gini
+    if group_cols is not None and len(group_cols) > 0:
+        gp_auc = df[df[x_score].notna()].groupby(group_cols).apply(
+            lambda x: mdlutil.evaluate_binary_classier(x[target], x[x_score], is_show=False))
+        gp_auc = gp_auc.reset_index().rename(columns={0: 'value'})
+        gp_auc.loc[:, ['cnt', 'auc', 'ks', 'gini']] = gp_auc['value'].apply(pd.Series,
+                                                                            index=['cnt', 'auc', 'ks', 'gini'])
+        gp_auc.drop(['value'], axis=1, inplace=True)
+        gp_auc['group_cols_str'] = gp_auc[group_cols].apply(lambda x: ':'.join(x), axis=1)
+        gp['group_cols_str'] = gp[group_cols].apply(lambda x: ':'.join(x), axis=1)
+
+    else:
+        cnt, auc, ks, gini = mdlutil.evaluate_binary_classier(df[df[x_score].notna()][target],
+                                                              df[df[x_score].notna()][x_score])
+        gp_auc = pd.DataFrame([[cnt, auc, ks, gini]], columns=['cnt', 'auc', 'ks', 'gini'], index=['all'])
+        print(gp_auc)
+        gp['group_cols_str'] = ''
+        gp_auc['group_cols_str'] = ''
+    gp_auc['auc_info'] = gp_auc.apply(
+        lambda x: 'cnt:{} auc:{} ks:{}'.format(x['cnt'], x['auc'], x['ks']), axis=1)
+    gp = gp.merge(gp_auc[['group_cols_str', 'auc_info']], on='group_cols_str', how='left')
+    gp['legend_name'] = gp.apply(
+        lambda x: '{}::{}'.format(x['group_cols_str'], x['auc_info']), axis=1)
+    # lift: rate_bad lift
+    t1 = gp[['legend_name', 'lbl', 'lbl_index', 'rate_bad']].rename(columns={'rate_bad': 'value'})
+    t1['key'] = 'rate_bad'
+    t2 = gp[['legend_name', 'lbl', 'lbl_index', 'accum_lift_bad']].rename(columns={'accum_lift_bad': 'value'})
+    t2['key'] = 'accum_lift_bad'
+    t = pd.concat([t1, t2])
+    t['lbl'] = t['lbl'].astype(str)
+    fig = px.line(t, x='lbl', y='value', color='legend_name',
+                  line_group='legend_name', facet_col='key',
+                  orientation='h', facet_col_wrap=2, markers=True,
+                  width=1000, height=1000 * 0.62, title=x_score)
+
+    fig.update_yaxes(
+        matches=None,showticklabels=True
+    )
+    fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+    fig.update_layout(
+        # 横向图例
+        legend=dict(orientation='h', yanchor="bottom", y=-0.5, xanchor="left", x=0),
+        xaxis=dict(tickangle=-30),
+    )
+    if is_show:
+        fig.show()
+    return fig, gp
+
+
+def plot_scores_liftvar(df, x_scores: list, target, n_bin=10, is_show=False):
+    """
+    多个模型分的lift图
+    数据为明细数据
+    :return fig,gp_lift
+    """
+    # 计算每个模型分的lift
+    data = []
+    for x in x_scores:
+        gp = mdlutil.liftvar(df, x, target, n_bin=n_bin)
+        t = df[df[x].notna()]
+        cnt, auc, ks, gini = mdlutil.evaluate_binary_classier(t[target], t[x])
+        gp['model_name'] = '{}::{}::auc={}::ks={}'.format(x, int(cnt), auc, ks)
+        data.append(gp)
+    gp = pd.concat(data)
+    # lift: rate_bad lift
+    t1 = gp[['model_name', 'lbl', 'lbl_index', 'rate_bad']].rename(columns={'rate_bad': 'value'})
+    t1['key'] = 'rate_bad'
+    t2 = gp[['model_name', 'lbl', 'lbl_index', 'accum_lift_bad']].rename(columns={'accum_lift_bad': 'value'})
+    t2['key'] = 'accum_lift_bad'
+    t = pd.concat([t1, t2])
+    fig = px.line(t, x='lbl_index', y='value', color='model_name', line_group='model_name', facet_col='key',
+                  orientation='h', facet_col_wrap=1,
+                  width=900, height=900 * 0.62)
+    fig.update_yaxes(
+        matches=None,
+    )
+    fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+    fig.update_layout(
+        # 横向图例
+        # legend=dict(orientation='h', yanchor="bottom", y=-0.4, xanchor="left", x=0),
+        xaxis=dict(tickangle=-30),
+    )
+    if is_show:
+        fig.show()
+    return fig, gp
 
 
 def plot_corr_heatmap(df, feature_cols) -> pd.DataFrame:
