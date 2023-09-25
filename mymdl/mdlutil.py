@@ -15,7 +15,6 @@ pd.set_option('display.max_rows', 2000)
 pd.set_option('display.max_columns', 2000)
 
 
-
 def describe_df(df, feature_names: list) -> pd.DataFrame:
     """
     描述性分析
@@ -311,6 +310,36 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
         fig.update_layout(title=title, uniformtext_minsize=2, uniformtext_mode='hide')
         fig.show()
     return len(y_true), auc, ks, gini
+
+
+def evaluate_multi_classier(y_true, y_pred):
+    """
+    适用于多分类:y_pred:预测类别
+    balanced_accuracy: 1/n * (sum( 预测为类别i 的数量 / 类别为i 的数量))
+    cohen_kappa_score:kappa 指数，评估 实际和预测的一致性，-1~1
+        0~0.2 Slight agreement  0.2~0.4 Fair agreement
+        0.41~0.6 Moderate   0.61~0.8 Substancial
+        0.81~1 almost perfect  <0 no
+    matthews_corrcoef:MCC 适用于 imbalanced  -1 ~ 1
+        0:random predict   1：perfert  -1 inverse preidct
+    :return cnt,balanced_accuracy,cohen_kappa,matthews_corrcoef
+    """
+    balanced_accuracy = metrics.balanced_accuracy_score(y_true, y_pred)
+    cohen_kappa = metrics.cohen_kappa_score(y_true, y_pred)
+    # 混淆矩阵，Mi,j  表示 实际类别为i,预测为j 的情况
+    cm = metrics.confusion_matrix(y_true, y_pred, normalize='all')
+    metrics.ConfusionMatrixDisplay(cm)
+    mcc = metrics.matthews_corrcoef(y_true, y_pred)
+    return len(y_true), balanced_accuracy, cohen_kappa, mcc
+
+def evaluate_regression(y_true,y_pred):
+    """
+    评估回归指标
+    :return cnt,mse,r2
+    """
+    mse = metrics.mean_squared_error(y_true,y_pred)
+    r2 = metrics.r2_score(y_true,y_pred)
+    return len(y_true),mse,r2
 
 
 
