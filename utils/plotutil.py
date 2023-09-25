@@ -8,13 +8,15 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
 
-def plot_hists(df,x,bar_col_color=None,n_bins=20)->go.Figure:
+
+def plot_hists(df, x, bar_col_color=None, n_bins=20) -> go.Figure:
     """
     概率密度图
     :param bar_col_color column of df
     """
-    fig = px.histogram(df,x=x,nbins=n_bins,histnorm='percent',color=bar_col_color,
-                       barmode='group',opacity=0.7)
+    fig = px.histogram(df, x=x, nbins=n_bins, histnorm='percent', color=bar_col_color,
+                       barmode='group', opacity=0.7)
+    fig.update_layout(bargap=0.2)
     return fig
 
 

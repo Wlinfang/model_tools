@@ -316,7 +316,8 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
         fig.show()
     return len(y_true), auc, ks, gini
 
-def evaluate_multi_classier(y_true,y_pred):
+
+def evaluate_multi_classier(y_true, y_pred):
     """
     适用于多分类 y_pred 为预测类别值
     balanced_accuracy_score ： 1/n (sum( 类别i预测对的数量 / 类别i的数量) )
@@ -325,12 +326,22 @@ def evaluate_multi_classier(y_true,y_pred):
     matthews_corrcoef: -1~1  值越大，一致性越高
     :return cnt,balanced_accuracy,cohen_kappa,mcc
     """
-    balanced_accuracy = metrics.balanced_accuracy_score(y_true,y_pred,)
-    cohen_kappa= metrics.cohen_kappa_score(y_true,y_pred)
-    cm = metrics.confusion_matrix(y_true,y_pred,normalize='all')
+    balanced_accuracy = metrics.balanced_accuracy_score(y_true, y_pred, )
+    cohen_kappa = metrics.cohen_kappa_score(y_true, y_pred)
+    cm = metrics.confusion_matrix(y_true, y_pred, normalize='all')
     metrics.ConfusionMatrixDisplay(cm)
-    mcc = metrics.matthews_corrcoef(y_true,y_pred)
-    return len(y_true),balanced_accuracy,cohen_kappa,mcc
+    mcc = metrics.matthews_corrcoef(y_true, y_pred)
+    return len(y_true), balanced_accuracy, cohen_kappa, mcc
+
+
+def evaluate_regression(y_true, y_pred):
+    """
+    r2
+    """
+    mse = metrics.mean_squared_error(y_true,y_pred)
+    r2 = metrics.r2_score(y_true, y_pred)
+    return mse,r2
+
 
 class Confidence:
     """
