@@ -5,7 +5,6 @@ from model_tools.mymdl import metricutil, mdlutil
 from sklearn.feature_selection import f_classif, SelectKBest
 
 
-
 def filter_avona_classier(df, feature_cols, target):
     """
     方差分析 F检验，返回过滤后的特征列表
@@ -20,6 +19,7 @@ def filter_avona_classier(df, feature_cols, target):
 def filter_corr_target(df, feature_cols, target, threld=0.02) -> list:
     """
     基于 pearsonr 过滤掉 feature 同 targe 不相关的特征
+    拒绝掉  （-threld，threld） 的特征
     :return:返回 有相关性的特征列表
     0~0.2 无相关或者积弱
     0.2~0.4 弱相关
@@ -27,10 +27,12 @@ def filter_corr_target(df, feature_cols, target, threld=0.02) -> list:
     0.6~0.8 强相关
     0.8~1  极强相关
     """
-    df_corr = metricutil.corr_target(df, feature_cols, target)
+    df_corr = df[feature_cols + [target]].corr()
+    df_corr = df_corr[target]
+    df_corr = df_corr[df_corr.index != target]
     # pearsonr
-    df_corr = df_corr[(df_corr['pearsonr'] > threld) | (df_corr['pearsonr'] < -threld)]
-    return df_corr['feature_name'].tolist()
+    df_corr = df_corr[(df_corr > threld) | (df_corr < -threld)]
+    return df_corr.index.tolist()
 
 
 def filter_all_miss(df, feature_cols):
