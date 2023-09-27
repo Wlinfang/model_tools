@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from typing import Union, Tuple
-
+from scipy import stats
 import logging
 
 from model_tools.utils import toolutil
@@ -191,3 +191,26 @@ def iv(df: pd.DataFrame, x: str, y: str, feature_grid=[], cut_type=1, n_bin=10):
     """
     gp = woe(df, x, y, feature_grid, cut_type, n_bin)
     return np.round(np.sum(gp['iv_bin']), 2)
+
+def corr_target(df, feature_cols, target) -> list:
+    """
+    过滤掉 feature 同 targe 不相关的特征
+    计算指标 pearsonr & spearmanr=(变量排序 + pearsonr) & kendalltau(有序性)
+    :return:返回 有相关性的特征列表
+    0~0.2 无相关或者积弱
+    0.2~0.4 弱相关
+    0.4~0.6 中等相关
+    0.6~0.8 强相关
+    0.8~1  极强相关
+    """
+    data = []
+    for f in feature_cols:
+        s1, p1 = stats.pearsonr(df[f], df[target])
+        s2, p2 = stats.spearmanr(df[f], df[target], nan_policy='omit')
+        s3, p3 = stats.kendalltau(df[f], df[target], nan_policy='omit')
+        data.append([f, s1, p1, s2, p2, s3, p3])
+    df_corr = pd.DataFrame(data, columns=['feature_name', 'pearsonr', 'pearsonr_pvalue',
+                                          'spearmanr', 'spearmanr_pvalue',
+                                          'kendall', 'kendall_pvalue'])
+
+    return df_corr

@@ -51,19 +51,11 @@ def build_tree(df, feature_names, target, max_depth=3):
     ftr_imp = pd.Series(dtr.feature_importances_, feature_names)
     return dtr, graph, ftr_imp
 
-def xgboost_multi_fit(df_train,df_val,feature_cols, target, cv_folds=5, max_depth=3,
-                learning_rate=0.05, n_estimators=500):
+
+def xgboost_multi_fit(df_train, df_val, feature_cols, target, cv_folds=5, max_depth=3,
+                      learning_rate=0.05, n_estimators=500):
     """
     适用于多分类
-    :param df_train:
-    :param df_val:
-    :param feature_cols:
-    :param target:
-    :param cv_folds:
-    :param max_depth:
-    :param learning_rate:
-    :param n_estimators:
-    :return:
     """
     # 利用cv 进行调参
     params = {
@@ -76,10 +68,10 @@ def xgboost_multi_fit(df_train,df_val,feature_cols, target, cv_folds=5, max_dept
         'booster': 'gbtree',
         'gamma': 0.0001,
         #     'tree_method':'hist',
-        #     'reg_alpha':,# L1
+        'reg_alpha': 0.02,  # L1
         #     'reg_lambda':,# L2
         'random_state': 1024,
-        'eval_metric': 'auc'
+        'eval_metric': metrics.balanced_accuracy_score
     }
     alg = XGBClassifier(**params)
     alg.set_params(num_class=len(np.unique(df_train[target])))
@@ -87,11 +79,11 @@ def xgboost_multi_fit(df_train,df_val,feature_cols, target, cv_folds=5, max_dept
     xgtrain = DMatrix(df_train[feature_cols].values, label=df_train[target].values)
 
     cvresult = cv(xgb_param, xgtrain, num_boost_round=alg.get_params()['n_estimators'],
-                  nfold=cv_folds, metrics='auc',
+                  nfold=cv_folds, metrics=metrics.balanced_accuracy_score,
                   early_stopping_rounds=10, verbose_eval=100, seed=1024, shuffle=True)
     # 更新参数
     alg.set_params(n_estimators=cvresult.shape[0])
-    alg.set_params(eval_metric='auc')
+    alg.set_params(eval_metric=metrics.balanced_accuracy_score)
     print(cvresult, cvresult.shape)
 
     #     eval_set=[(df_val[feature_cols],df_val[resp])]
@@ -107,6 +99,7 @@ def xgboost_multi_fit(df_train,df_val,feature_cols, target, cv_folds=5, max_dept
     feat_imp = feat_imp[feat_imp > 0]
 
     return alg, feat_imp
+
 
 def xgboost_fit(df_train, df_val, feature_cols, target, cv_folds=5, max_depth=3,
                 learning_rate=0.05, n_estimators=500):

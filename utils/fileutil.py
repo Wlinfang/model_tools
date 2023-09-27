@@ -7,7 +7,7 @@ import pickle
 # PMML方式保存和读取模型
 from sklearn2pmml import sklearn2pmml, PMMLPipeline
 from pypmml import Model
-
+import joblib
 
 def save_model_as_pkl(model, path):
     """
@@ -30,6 +30,10 @@ def load_model_from_pkl(path):
         model = pickle.load(f)
     return model
 
+def load_by_joblib(path):
+    with open(path, 'rb') as f:
+        model = joblib.load(path)
+    return model
 
 def save_model_as_pmml(alg, save_file_path):
     """

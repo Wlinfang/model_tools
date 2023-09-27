@@ -124,7 +124,8 @@ class FeatureEngineer:
         f_n = feature_name + '_miss'
         df[f_n] = 0
         df.loc[df[feature_name].isna(), f_n] = 1
-        self.feature_cols.append(f_n)
+        if f_n not in self.feature_cols:
+            self.feature_cols.append(f_n)
         # 填充
         df[feature_name] = df[feature_name].fillna(fill_value)
         return df

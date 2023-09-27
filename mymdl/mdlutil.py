@@ -227,6 +227,10 @@ def evaluate_twoscores_lift(df, f1, f2, target, n_bin=10, show_flat=True):
     gp_out = gp_out.merge(t_accum_rate, on=[ix, column], how='outer')
     # 累计所有坏的比例
     t_accum_bad = gp['sum'].cumsum(axis=1).cumsum(axis=0)
+    t_accum_rate_bad = np.round(t_accum_bad/t_accum_cnt,2)
+    t_accum_rate_bad=t_accum_rate_bad.stack().reset_index().rename(columns={0: 'accum_rate_bad'})
+    gp_out = gp_out.merge(t_accum_rate_bad, on=[ix, column], how='outer')
+    # 累计坏占所有坏的占比
     t_accum_bad = t_accum_bad / all_bad_cnt
     # lift
     t_accum_bad = t_accum_bad / all_bad_rate
@@ -240,9 +244,9 @@ def evaluate_twoscores_lift(df, f1, f2, target, n_bin=10, show_flat=True):
         #                         columns=[column, 'key'],
         #                         aggfunc=np.mean, sort=False)
         # gp_out = gp_out['value']
-        gp_out=pd.pivot_table(gp_out, values=['cnt', 'rate_bad', 'accum_cnt_rate', 'accum_lift_bad'], index=ix,
-                       columns=column,
-                       aggfunc=np.mean, sort=False)
+        gp_out = pd.pivot_table(gp_out, values=['cnt', 'rate_bad', 'accum_cnt_rate','accum_rate_bad', 'accum_lift_bad'], index=ix,
+                                columns=column,
+                                aggfunc=np.mean, sort=False)
     return gp_out
 
 
@@ -336,9 +340,9 @@ def evaluate_regression(y_true, y_pred):
     """
     r2
     """
-    mse = metrics.mean_squared_error(y_true,y_pred)
+    mse = metrics.mean_squared_error(y_true, y_pred)
     r2 = metrics.r2_score(y_true, y_pred)
-    return mse,r2
+    return mse, r2
 
 
 class Confidence:

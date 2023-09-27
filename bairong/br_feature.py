@@ -11,8 +11,8 @@ class ApplyLoanStr:
     """
 
     def __init__(self, feature_cols, feature_dict):
-        self.feature_cols = feature_cols
-        self.feature_dict = feature_dict
+        # self.feature_cols = feature_cols
+        # self.feature_dict = feature_dict
         self.feature_engineer = FeatureEngineer.build_cls(feature_cols, feature_dict)
 
     def add_features(self, df):
@@ -43,93 +43,98 @@ class ApplyLoanStr:
 
         # 小贷机构数-新版统计方式
         df = self.feature_engineer.add_feature_sum(df, 'als_m1_cell_nbank_sloan_nsloan_orgnum',
-                                                   '按手机号查询，近1月小贷机构数',
+                                                   '新版-按手机号查询，近1月小贷机构数',
                                                    ['als_m1_cell_nbank_nsloan_orgnum',
                                                     'als_m1_cell_nbank_sloan_orgnum'])
 
         df = self.feature_engineer.add_feature_sum(df, 'als_m3_cell_nbank_sloan_nsloan_orgnum',
-                                                   '按手机号查询，近3月小贷机构数',
+                                                   '新版-按手机号查询，近3月小贷机构数',
                                                    ['als_m3_cell_nbank_nsloan_orgnum',
                                                     'als_m3_cell_nbank_sloan_orgnum'])
 
         df = self.feature_engineer.add_feature_sum(df, 'als_m6_cell_nbank_sloan_nsloan_orgnum',
-                                                   '按手机号查询，近6月小贷机构数',
+                                                   '新版-按手机号查询，近6月小贷机构数',
                                                    ['als_m6_cell_nbank_nsloan_orgnum',
                                                     'als_m6_cell_nbank_sloan_orgnum'])
 
         df = self.feature_engineer.add_feature_sum(df, 'als_m12_cell_nbank_sloan_nsloan_orgnum',
-                                                   '按手机号查询，近12月小贷机构数',
+                                                   '新版-按手机号查询，近12月小贷机构数',
                                                    ['als_m12_cell_nbank_nsloan_orgnum',
                                                     'als_m12_cell_nbank_sloan_orgnum'])
 
         # 近7天/近1月
-        df = self.feature_engineer.add_feature_divide(df, 'als_d7_over_m1_cell_orgrate', '近7天申请机构占近1月比率',
+        df = self.feature_engineer.add_feature_divide(df, 'als_d7_over_m1_cell_orgrate', '按手机号查询，近7天申请机构占近1月比率',
                                                       'als_d7_cell_orgnum', 'als_m1_cell_orgnum')
         # 近3月/近6月
-        df = self.feature_engineer.add_feature_divide(df, 'als_m3_over_m6_cell_orgrate', '近3月申请机构占近6月比率',
+        df = self.feature_engineer.add_feature_divide(df, 'als_m3_over_m6_cell_orgrate', '按手机号查询，近3月申请机构占近6月比率',
                                                       'als_m3_cell_orgnum', 'als_m6_cell_orgnum')
         # 近6月/近12月
-        df = self.feature_engineer.add_feature_divide(df, 'als_m6_over_m12_cell_orgrate', '近6月申请机构占近12月比率',
+        df = self.feature_engineer.add_feature_divide(df, 'als_m6_over_m12_cell_orgrate', '按手机号查询，近6月申请机构占近12月比率',
                                                       'als_m6_cell_orgnum', 'als_m12_cell_orgnum')
 
         # 近3月非银机构占比
-        df = self.feature_engineer.add_feature_divide(df, 'als_m3_cell_nbank_orgrate', '近3月非银机构占比',
+        df = self.feature_engineer.add_feature_divide(df, 'als_m3_cell_nbank_orgrate', '按手机号查询，近3月非银机构占比',
                                                       'als_m3_cell_nbank_orgnum', 'als_m3_cell_orgnum')
 
         # 近6个月非银机构占比
-        df = self.feature_engineer.add_feature_divide(df, 'als_m6_cell_nbank_orgrate', '近6月非银机构占比',
+        df = self.feature_engineer.add_feature_divide(df, 'als_m6_cell_nbank_orgrate', '按手机号查询，近6月非银机构占比',
                                                       'als_m6_cell_nbank_orgnum', 'als_m6_cell_orgnum')
 
         # 近12月非银机构占比
-        df = self.feature_engineer.add_feature_divide(df, 'als_m12_cell_nbank_orgrate', '近12月非银机构占比',
+        df = self.feature_engineer.add_feature_divide(df, 'als_m12_cell_nbank_orgrate', '按手机号查询，近12月非银机构占比',
                                                       'als_m12_cell_nbank_orgnum', 'als_m12_cell_orgnum')
 
         # 近3个月非银其他机构占比
-        df = self.feature_engineer.add_feature_divide(df, 'als_m3_cell_nbank_else_orgrate', '近3月非银其他机构占比',
+        df = self.feature_engineer.add_feature_divide(df, 'als_m3_cell_nbank_else_orgrate', '新版-按手机号查询，近3月非银其他机构占比',
                                                       'als_m3_cell_nbank_else_orgnum', 'als_m3_cell_orgnum')
 
         # 近6个月非银其他机构占比
-        df = self.feature_engineer.add_feature_divide(df, 'als_m6_cell_nbank_else_orgrate', '近6月非银其他机构占比',
+        df = self.feature_engineer.add_feature_divide(df, 'als_m6_cell_nbank_else_orgrate', '新版-按手机号查询，近6月非银其他机构占比',
                                                       'als_m6_cell_nbank_else_orgnum', 'als_m6_cell_orgnum')
 
         # 近12个月非银其他机构占比
-        df = self.feature_engineer.add_feature_divide(df, 'als_m12_cell_nbank_else_orgrate', '近12月非银其他机构占比',
+        df = self.feature_engineer.add_feature_divide(df, 'als_m12_cell_nbank_else_orgrate', '新版-按手机号查询，近12月非银其他机构占比',
                                                       'als_m12_cell_nbank_else_orgnum', 'als_m12_cell_orgnum')
+
+        # 近7日其他机构占比-老版
+        df = self.feature_engineer.add_feature_divide(df, 'als_d7_cell_nbank_oth_orgrate',
+                                                      '按手机号查询，近7日其他机构占比',
+                                                      'als_d7_cell_nbank_oth_orgnum', 'als_d7_cell_orgnum')
+
+        # 近3月其他机构占比-老版
+        df = self.feature_engineer.add_feature_divide(df, 'als_m3_cell_nbank_oth_orgrate',
+                                                      '按手机号查询，近3月其他机构占比',
+                                                      'als_m3_cell_nbank_oth_orgnum', 'als_m3_cell_orgnum')
+
 
         # 近3个月小贷机构占比
         df = self.feature_engineer.add_feature_divide(df, 'als_m3_cell_nbank_sloan_nsloan_orgrate',
-                                                      '近3月非银小贷机构占比',
+                                                      '新版-按手机号查询，近3月非银小贷机构占比',
                                                       'als_m3_cell_nbank_sloan_nsloan_orgnum', 'als_m3_cell_orgnum')
         # 近6个月小贷机构占比
         df = self.feature_engineer.add_feature_divide(df, 'als_m6_cell_nbank_sloan_nsloan_orgrate',
-                                                      '近6月非银小贷机构占比',
+                                                      '新版-按手机号查询，近6月非银小贷机构占比',
                                                       'als_m6_cell_nbank_sloan_nsloan_orgnum', 'als_m6_cell_orgnum')
 
         # 近12个月小贷机构占比
         df = self.feature_engineer.add_feature_divide(df, 'als_m12_cell_nbank_sloan_nsloan_orgrate',
-                                                      '近12月非银小贷机构占比',
+                                                      '新版-按手机号查询，近12月非银小贷机构占比',
                                                       'als_m12_cell_nbank_sloan_nsloan_orgnum', 'als_m12_cell_orgnum')
 
-        # 近7日小额现金贷机构占比--老版
-        df = self.feature_engineer.add_feature_divide(df, 'als_d7_cell_pdl_orgrate', '近7日小额现金机构占比',
+        # 近7日小额现金贷机构占比--业务
+        df = self.feature_engineer.add_feature_divide(df, 'als_d7_cell_pdl_orgrate', '按手机号查询，近7日小额现金机构占比',
                                                       'als_d7_cell_pdl_orgnum', 'als_d7_cell_orgnum')
-        # 近3月小额现金贷机构占比--老版
-        df = self.feature_engineer.add_feature_divide(df, 'als_m3_cell_pdl_orgrate', '近3月小额现金机构占比',
+        # 近3月小额现金贷机构占比
+        df = self.feature_engineer.add_feature_divide(df, 'als_m3_cell_pdl_orgrate', '按手机号查询，近3月小额现金机构占比',
                                                       'als_m3_cell_pdl_orgnum', 'als_m3_cell_orgnum')
 
         # 近3月非银小贷机构对于12月比率
         df = self.feature_engineer.add_feature_divide(df, 'als_m3_over_m12_cell_nbank_sloan_nsloan_orgrate',
-                                                      '近3月非银小贷机构对于12月比率',
+                                                      '按手机号查询，近3月非银小贷机构对于12月比率',
                                                       'als_m3_cell_nbank_sloan_nsloan_orgnum',
                                                       'als_m12_cell_nbank_sloan_nsloan_orgnum')
 
-        # 近7日其他机构占比
-        df = self.feature_engineer.add_feature_divide(df, 'als_d7_cell_nbank_oth_orgrate', '近7日其他机构占比',
-                                                      'als_d7_cell_nbank_oth_orgnum', 'als_d7_cell_orgnum')
 
-        # 近3月其他机构占比
-        df = self.feature_engineer.add_feature_divide(df, 'als_m3_cell_nbank_oth_orgrate', '近3月其他机构占比',
-                                                      'als_m3_cell_nbank_oth_orgnum', 'als_m3_cell_orgnum')
 
         # ================== 手机号查询，申请次数 ==================#
 
@@ -247,9 +252,13 @@ class ApplyLoanStr:
                                                       '按手机号查询，近12月消费分期申请次数占比',
                                                       'als_m12_cell_nbank_cf_allnum', 'als_m12_cell_allnum')
 
+        return df
+
+
+
     def add_features_v2(self, df):
         """
-        第二版：由于身份证号&手机号查询返回数字可能不一样，提取最大值
+        第二版：由于身份证号&手机号查询返回数字不一样，加入身份证号
         :param df:
         :return:
         """
@@ -401,36 +410,36 @@ class ApplyLoanStr:
         df = self.feature_engineer.add_feature_divide(df, 'als_m12_nbank_orgrate', '近12月非银机构占比',
                                                       'als_m12_nbank_orgnum', 'als_m12_orgnum')
 
-        # 近3个月非银其他机构占比
-        df = self.feature_engineer.add_feature_max(df, 'als_m3_nbank_else_orgnum', '近3月非银其他机构数',
+        # 近3个月非银其他机构占比-新版
+        df = self.feature_engineer.add_feature_max(df, 'als_m3_nbank_else_orgnum', '新版-近3月非银其他机构数',
                                                    ['als_m3_cell_nbank_else_orgnum', 'als_m3_id_nbank_else_orgnum'])
-        df = self.feature_engineer.add_feature_divide(df, 'als_m3_nbank_else_orgrate', '近3月非银其他机构占比',
+        df = self.feature_engineer.add_feature_divide(df, 'als_m3_nbank_else_orgrate', '新版-近3月非银其他机构占比',
                                                       'als_m3_nbank_else_orgnum', 'als_m3_orgnum')
 
         # 近6个月非银其他机构占比
-        df = self.feature_engineer.add_feature_max(df, 'als_m6_nbank_else_orgnum', '近6月非银其他机构数',
+        df = self.feature_engineer.add_feature_max(df, 'als_m6_nbank_else_orgnum', '新版-近6月非银其他机构数',
                                                    ['als_m6_cell_nbank_else_orgnum', 'als_m6_id_nbank_else_orgnum'])
-        df = self.feature_engineer.add_feature_divide(df, 'als_m6_nbank_else_orgrate', '近6月非银其他机构占比',
+        df = self.feature_engineer.add_feature_divide(df, 'als_m6_nbank_else_orgrate', '新版-近6月非银其他机构占比',
                                                       'als_m6_nbank_else_orgnum', 'als_m6_orgnum')
 
         # 近12个月非银其他机构占比
-        df = self.feature_engineer.add_feature_max(df, 'als_m12_nbank_else_orgnum', '近12月非银其他机构数',
+        df = self.feature_engineer.add_feature_max(df, 'als_m12_nbank_else_orgnum', '新版-近12月非银其他机构数',
                                                    ['als_m12_cell_nbank_else_orgnum', 'als_m12_id_nbank_else_orgnum'])
-        df = self.feature_engineer.add_feature_divide(df, 'als_m12_nbank_else_orgrate', '近12月非银其他机构占比',
+        df = self.feature_engineer.add_feature_divide(df, 'als_m12_nbank_else_orgrate', '新版-近12月非银其他机构占比',
                                                       'als_m12_nbank_else_orgnum', 'als_m12_orgnum')
 
         # 近3个月小贷机构占比
         df = self.feature_engineer.add_feature_divide(df, 'als_m3_nbank_sloan_nsloan_orgrate',
-                                                      '近3月非银小贷机构占比',
+                                                      '新版-近3月非银小贷机构占比',
                                                       'als_m3_nbank_sloan_nsloan_orgnum', 'als_m3_orgnum')
         # 近6个月小贷机构占比
         df = self.feature_engineer.add_feature_divide(df, 'als_m6_nbank_sloan_nsloan_orgrate',
-                                                      '近6月非银小贷机构占比',
+                                                      '新版-近6月非银小贷机构占比',
                                                       'als_m6_nbank_sloan_nsloan_orgnum', 'als_m6_orgnum')
 
         # 近12个月小贷机构占比
         df = self.feature_engineer.add_feature_divide(df, 'als_m12_nbank_sloan_nsloan_orgrate',
-                                                      '近12月非银小贷机构占比',
+                                                      '新版-近12月非银小贷机构占比',
                                                       'als_m12_nbank_sloan_nsloan_orgnum', 'als_m12_orgnum')
 
         # 小贷申请机构数

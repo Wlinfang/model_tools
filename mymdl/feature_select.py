@@ -2,8 +2,35 @@ import pandas as pd
 import numpy as np
 from typing import Tuple, List
 from model_tools.mymdl import metricutil, mdlutil
+from sklearn.feature_selection import f_classif, SelectKBest
 
-import logging
+
+
+def filter_avona_classier(df, feature_cols, target):
+    """
+    方差分析 F检验，返回过滤后的特征列表
+    """
+    skb = SelectKBest(f_classif, k='all')
+    skb.fit(df[feature_cols], df[target])
+    df_pvalue = pd.DataFrame(skb.pvalues_, index=skb.feature_names_in_, columns=['pvalue'])
+    # 过滤掉 pvalue
+    return df_pvalue[df_pvalue.pvalue < 0.05].index.tolist()
+
+
+def filter_corr_target(df, feature_cols, target, threld=0.02) -> list:
+    """
+    基于 pearsonr 过滤掉 feature 同 targe 不相关的特征
+    :return:返回 有相关性的特征列表
+    0~0.2 无相关或者积弱
+    0.2~0.4 弱相关
+    0.4~0.6 中等相关
+    0.6~0.8 强相关
+    0.8~1  极强相关
+    """
+    df_corr = metricutil.corr_target(df, feature_cols, target)
+    # pearsonr
+    df_corr = df_corr[(df_corr['pearsonr'] > threld) | (df_corr['pearsonr'] < -threld)]
+    return df_corr['feature_name'].tolist()
 
 
 def filter_all_miss(df, feature_cols):
@@ -15,7 +42,7 @@ def filter_all_miss(df, feature_cols):
     return df
 
 
-def filter_miss_freq(df, feature_cols, miss_threold=0.9,freq_threold=0.8) -> List:
+def filter_miss_freq(df, feature_cols, miss_threold=0.9, freq_threold=0.8) -> List:
     """
     过滤缺失值超过 miss_threold 的特征
     过滤众数占比高超过 freq_threold 的特征
@@ -28,7 +55,7 @@ def filter_miss_freq(df, feature_cols, miss_threold=0.9,freq_threold=0.8) -> Lis
     miss_feature_cols = gp[gp['miss_rate_float'] > miss_threold].index.tolist()
     gp['freq_rate'] = np.round(gp['freq_count'] / gp['count'], 2)
     drop_cols = gp[gp['freq_rate'] > freq_threold].index.tolist()
-    return list(set(feature_cols) - set(miss_feature_cols)-set(drop_cols))
+    return list(set(feature_cols) - set(miss_feature_cols) - set(drop_cols))
 
 
 def filter_corr(df, feature_cols, threold):
