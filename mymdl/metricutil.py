@@ -5,6 +5,8 @@ from scipy import stats
 import logging
 
 from model_tools.utils import toolutil
+
+
 def get_feature_grid(values: Union[list, np.array],
                      cut_type=1, n_bin=10, default_values=[]) -> list:
     """
@@ -192,6 +194,7 @@ def iv(df: pd.DataFrame, x: str, y: str, feature_grid=[], cut_type=1, n_bin=10):
     gp = woe(df, x, y, feature_grid, cut_type, n_bin)
     return np.round(np.sum(gp['iv_bin']), 2)
 
+
 def corr_target(df, feature_cols, target) -> list:
     """
     过滤掉 feature 同 targe 不相关的特征
@@ -205,7 +208,10 @@ def corr_target(df, feature_cols, target) -> list:
     """
     data = []
     for f in feature_cols:
-        s1, p1 = stats.pearsonr(df[f], df[target])
+        t = df[df[f].notna()]
+        if t.shape[0] < 5:
+            continue
+        s1, p1 = stats.pearsonr(t[f], t[target])
         s2, p2 = stats.spearmanr(df[f], df[target], nan_policy='omit')
         s3, p3 = stats.kendalltau(df[f], df[target], nan_policy='omit')
         data.append([f, s1, p1, s2, p2, s3, p3])
