@@ -95,7 +95,7 @@ def univar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
 
 
 def binary_liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
-            cut_type=1, n_bin=10, group_cols=[]) -> pd.DataFrame:
+                   cut_type=1, n_bin=10, group_cols=[]) -> pd.DataFrame:
     """
     变量lift 分布，适用于y值二分类,对 x 变量进行分组
     :param y  定义 坏=1   好=0
@@ -117,53 +117,54 @@ def binary_liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     # 分组对y 进行计算
     gp = pd.pivot_table(df, values=y, index=cls_cols,
                         sort='lbl_index', aggfunc=['count', 'sum'],
-                        fill_value=0, margins=False, observed=True)
+                        margins=False, observed=True)
     gp.columns = ['cnt', 'cnt_bad']
-    gp['cnt_good'] = gp['cnt'] - gp['cnt_bad']
+    # gp['cnt_good'] = gp['cnt'] - gp['cnt_bad']
     gp['rate_bad'] = np.round(gp['cnt_bad'] / gp['cnt'], 3)
 
     if group_cols is None or len(group_cols) == 0:
         # 累计
         gp['accum_cnt'] = gp['cnt'].cumsum()
         gp['accum_cnt_bad'] = gp['cnt_bad'].cumsum()
-        gp['accum_cnt_good'] = gp['cnt_good'].cumsum()
+        # gp['accum_cnt_good'] = gp['cnt_good'].cumsum()
         gp['accum_rate_bad'] = np.round(gp['accum_cnt_bad'] / gp['accum_cnt'], 2)
 
         # 坏样本占整体坏样本比例
-        gp['accum_rate_bad_over_allbad'] = np.round(gp['accum_cnt_bad'] / gp['cnt_bad'].sum(), 3)
+        # gp['accum_rate_bad_over_allbad'] = np.round(gp['accum_cnt_bad'] / gp['cnt_bad'].sum(), 3)
         # 好样本占整体好样本比例
-        gp['accum_rate_good_over_allgood'] = np.round(gp['accum_cnt_good'] / gp['cnt_good'].sum(), 3)
-        # lift = bad_over_allbad_rate / bad_rate
+        # gp['accum_rate_good_over_allgood'] = np.round(gp['accum_cnt_good'] / gp['cnt_good'].sum(), 3)
+        # lift = accum_rate_bad / bad_rate
         # 整体bad_rate
         all_bad_rate = np.round(gp['cnt_bad'].sum() / gp['cnt'].sum(), 4)
-        gp['accum_lift_bad'] = np.round(gp['accum_rate_bad_over_allbad'] / all_bad_rate, 3)
+        gp['accum_lift_bad'] = np.round(gp['accum_rate_bad'] / all_bad_rate, 3)
     else:
         gp['accum_cnt'] = gp.groupby(group_cols)['cnt'].cumsum()
         gp['accum_cnt_bad'] = gp.groupby(group_cols)['cnt_bad'].cumsum()
-        gp['accum_cnt_good'] = gp.groupby(group_cols)['cnt_good'].cumsum()
+        # gp['accum_cnt_good'] = gp.groupby(group_cols)['cnt_good'].cumsum()
         gp['accum_rate_bad'] = np.round(gp['accum_cnt_bad'] / gp['accum_cnt'], 2)
         tmp = gp.groupby(group_cols).agg(all_cnt_bad=('cnt_bad', 'sum'),
-                                         all_cnt_good=('cnt_good', 'sum')).reset_index()
-        tmp['all_rate_bad'] = np.round(tmp['all_cnt_bad'] / (tmp['all_cnt_bad'] + tmp['all_cnt_good']), 3)
+                                         all_cnt=('cnt', 'sum')).reset_index()
+        tmp['all_rate_bad'] = np.round(tmp['all_cnt_bad'] / tmp['all_cnt'], 3)
         # index = group_cols + ['lbl', 'lbl_index', 'lbl_left']
         # tmp = index = group_cols 需要对其，否则丢失字段
         gp = gp.reset_index()
         gp = gp.merge(tmp, on=group_cols, how='left')
 
-        # 坏样本占整体坏样本比例
-        gp['accum_rate_bad_over_allbad'] = np.round(gp['accum_cnt_bad'] / gp['all_cnt_bad'], 3)
-        # 好样本占整体好样本比例
-        gp['accum_rate_good_over_allgood'] = np.round(gp['accum_cnt_good'] / gp['all_cnt_good'], 3)
+        # # 坏样本占整体坏样本比例
+        # gp['accum_rate_bad_over_allbad'] = np.round(gp['accum_cnt_bad'] / gp['all_cnt_bad'], 3)
+        # # 好样本占整体好样本比例
+        # gp['accum_rate_good_over_allgood'] = np.round(gp['accum_cnt_good'] / gp['all_cnt_good'], 3)
         # lift = bad_over_allbad_rate / bad_rate
-        gp['accum_lift_bad'] = np.round(gp['accum_rate_bad_over_allbad'] / gp['all_rate_bad'], 3)
+        # gp['accum_lift_bad'] = np.round(gp['accum_rate_bad_over_allbad'] / gp['all_rate_bad'], 3)
+        gp['accum_lift_bad'] = np.round(gp['accum_rate_bad'] / gp['all_rate_bad'], 3)
         # 删除
-        gp.drop(['all_cnt_bad', 'all_cnt_good', 'all_rate_bad'], axis=1, inplace=True)
+        gp.drop(['all_cnt_bad', 'all_cnt', 'all_rate_bad'], axis=1, inplace=True)
     gp.reset_index(inplace=True)
     cols = cls_cols + ['cnt', 'cnt_bad', 'rate_bad', 'accum_cnt', 'accum_cnt_bad', 'accum_rate_bad', 'accum_lift_bad']
     return gp[cols]
 
 
-def multiscores_binary_liftvar(df, model_scores:list, target, n_bin=10)->pd.DataFrame:
+def multiscores_binary_liftvar(df, model_scores: list, target, n_bin=10) -> pd.DataFrame:
     """
     评估多个模型分的联合的lift 变化,适用于二分类目标变量的评估
     :param model_scores:模型分
@@ -171,7 +172,7 @@ def multiscores_binary_liftvar(df, model_scores:list, target, n_bin=10)->pd.Data
     :param show_flat 数据展示模型，True 展开；False 堆叠
     :return:'cnt', 'rate_bad', 'accum_cnt_rate', 'accum_rate_bad', 'accum_lift_bad'
     """
-    cols = [target]+model_scores
+    cols = [target] + model_scores
     df = df[cols]
     # 每个模型分分桶
     for score in model_scores:
@@ -182,48 +183,49 @@ def multiscores_binary_liftvar(df, model_scores:list, target, n_bin=10)->pd.Data
     gp = pd.pivot_table(df, values=[target], index=ixes,
                         aggfunc=('count', 'sum', 'mean'), observed=True, )
     gp = gp[target]
+    gp.rename(columns={'count': 'cnt', 'sum': 'cnt_bad', 'mean': 'rate_bad'}, inplace=True)
     # 所有的数量
     all_cnt = df.shape[0]
     all_bad_cnt = df[target].sum()
     all_bad_rate = np.round(all_bad_cnt / all_cnt, 3)
-    # 分组数量计算
-    t_cnt = gp['count']
-    t_cnt = t_cnt.stack().reset_index().rename(columns={0: 'cnt'})
-    # 每组坏比例
-    t_bad_rate = gp['mean']
-    t_bad_rate = t_bad_rate.stack().reset_index().rename(columns={0: 'rate_bad'})
-    gp_out = t_cnt.merge(t_bad_rate, on=[ix, column], how='outer')
-    # 累计总量
-    t_accum_cnt = gp['count'].cumsum(axis=1).cumsum(axis=0)
-    # 累计总量占比
-    t_accum_rate = np.round(t_accum_cnt / all_cnt, 2)
-    t_accum_rate = t_accum_rate.stack().reset_index().rename(columns={0: 'accum_cnt_rate'})
-    gp_out = gp_out.merge(t_accum_rate, on=[ix, column], how='outer')
-    # 累计所有坏的比例
-    t_accum_bad = gp['sum'].cumsum(axis=1).cumsum(axis=0)
-    t_accum_rate_bad = np.round(t_accum_bad / t_accum_cnt, 2)
-    t_accum_rate_bad = t_accum_rate_bad.stack().reset_index().rename(columns={0: 'accum_rate_bad'})
-    gp_out = gp_out.merge(t_accum_rate_bad, on=[ix, column], how='outer')
-    # 累计坏占所有坏的占比
-    t_accum_bad = t_accum_bad / all_bad_cnt
-    # lift
-    t_accum_bad = t_accum_bad / all_bad_rate
-    t_accum_bad = t_accum_bad.stack().reset_index().rename(columns={0: 'accum_lift_bad'})
-    gp_out = gp_out.merge(t_accum_bad, on=[ix, column], how='outer')
-    if not show_flat:
-        # 堆叠模式
-        # gp_out = gp_out.set_index([ix, column])
-        # gp_out = gp_out.stack().reset_index().rename(columns={'level_2': 'key', 0: 'value'})
-        # gp_out = pd.pivot_table(gp_out, values=['value'], index=ix,
-        #                         columns=[column, 'key'],
-        #                         aggfunc=np.mean, sort=False)
-        # gp_out = gp_out['value']
-        gp_out = pd.pivot_table(gp_out,
-                                values=['cnt', 'rate_bad', 'accum_cnt_rate', 'accum_rate_bad', 'accum_lift_bad'],
-                                index=ix,
-                                columns=column,
-                                aggfunc=np.mean, sort=False)
-    return gp_out
+    gp['accum_cnt'] = gp['cnt'].cumsum()
+    gp['accum_cnt_bad'] = gp['cnt_bad'].cumsum()
+    gp['accum_cnt_rate'] = np.round(gp['accum_cnt'] / all_cnt, 2)
+    gp['accum_rate_bad'] = np.round(gp['accum_cnt_bad'] / gp['accum_cnt'], 2)
+    gp['accum_lift_bad'] = np.round(gp['accum_rate_bad'] / all_bad_rate, 3)
+    gp=gp.reset_index()
+
+    # # 分组数量计算
+    # t_cnt = gp['count']
+    # t_cnt = t_cnt.stack().reset_index().rename(columns={0: 'cnt'})
+    # # 每组坏比例
+    # t_bad_rate = gp['mean']
+    # t_bad_rate = t_bad_rate.stack().reset_index().rename(columns={0: 'rate_bad'})
+    # gp_out = t_cnt.merge(t_bad_rate, on=[ix, column], how='outer')
+    # # 累计总量
+    # t_accum_cnt = gp['count'].cumsum(axis=1).cumsum(axis=0)
+    # # 累计总量占比
+    # t_accum_rate = np.round(t_accum_cnt / all_cnt, 2)
+    # t_accum_rate = t_accum_rate.stack().reset_index().rename(columns={0: 'accum_cnt_rate'})
+    # gp_out = gp_out.merge(t_accum_rate, on=[ix, column], how='outer')
+    # # 累计所有坏的比例
+    # t_accum_bad = gp['sum'].cumsum(axis=1).cumsum(axis=0)
+    # t_accum_rate_bad = np.round(t_accum_bad / t_accum_cnt, 2)
+    # t_accum_rate_bad = t_accum_rate_bad.stack().reset_index().rename(columns={0: 'accum_rate_bad'})
+    # gp_out = gp_out.merge(t_accum_rate_bad, on=[ix, column], how='outer')
+    # # 累计坏占所有坏的占比
+    # t_accum_bad = t_accum_bad / all_bad_cnt
+    # # lift
+    # t_accum_bad = t_accum_bad / all_bad_rate
+    # t_accum_bad = t_accum_bad.stack().reset_index().rename(columns={0: 'accum_lift_bad'})
+    # gp_out = gp_out.merge(t_accum_bad, on=[ix, column], how='outer')
+    # if not show_flat:
+    #     gp_out = pd.pivot_table(gp_out,
+    #                             values=['cnt', 'rate_bad', 'accum_cnt_rate', 'accum_rate_bad', 'accum_lift_bad'],
+    #                             index=ix,
+    #                             columns=column,
+    #                             aggfunc=np.mean, sort=False)
+    return gp
 
 
 def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
