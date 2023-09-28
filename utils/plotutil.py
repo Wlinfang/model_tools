@@ -245,7 +245,7 @@ def plot_score_liftvar(df, x_score: str, target, group_cols=[], n_bin=10, featur
                   width=1000, height=1000 * 0.62, title=x_score)
 
     fig.update_yaxes(
-        matches=None,showticklabels=True
+        matches=None, showticklabels=True
     )
     fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
     fig.update_layout(
@@ -336,6 +336,25 @@ def plot_scatter_matrix(df, feature_cols, group_feature_name=None):
         sns.pairplot(df[feature_cols])
     else:
         sns.pairplot(df[feature_cols + [group_feature_name]], hue=group_feature_name)
+
+
+def plot_target_scatter_matrix(df, feature_cols, target, group_feature_name=None,is_show=True)->go.Figure:
+    """
+    特征同目标变量之间的散点图
+    """
+    if group_feature_name is None:
+        ix_cols = [target]
+        df = df[feature_cols + [target]]
+    else:
+        ix_cols = [target, group_feature_name]
+        df = df[feature_cols + [target, group_feature_name]]
+    gp = df.set_index(ix_cols).stack().reset_index().rename(columns={'level_2': 'feature_name', 0: 'feature_value'})
+    fig = px.scatter(gp, x='feature_value', y=target, color=group_feature_name, facet_col='feature_name',
+                     facet_col_wrap=1, facet_row_spacing=0.1, width=1000, height=1000 * 0.62)
+    fig.update_yaxes(matches=None)
+    if is_show:
+        fig.show()
+    return fig
 
 
 def save_fig_tohtml(file_name: str, fig: go.Figure):
