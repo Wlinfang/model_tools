@@ -163,7 +163,7 @@ def binary_liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     return gp[cols]
 
 
-def evaluate_multiscores_binary_liftvar(df, model_scores:list, target, n_bin=10)->pd.DataFrame:
+def multiscores_binary_liftvar(df, model_scores:list, target, n_bin=10)->pd.DataFrame:
     """
     评估多个模型分的联合的lift 变化,适用于二分类目标变量的评估
     :param model_scores:模型分
