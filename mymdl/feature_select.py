@@ -8,6 +8,7 @@ from sklearn.feature_selection import f_classif, SelectKBest
 def filter_avona_classier(df, feature_cols, target):
     """
     方差分析 F检验，返回过滤后的特征列表
+
     """
     skb = SelectKBest(f_classif, k='all')
     skb.fit(df[feature_cols], df[target])
