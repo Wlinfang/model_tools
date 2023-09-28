@@ -61,37 +61,11 @@ def describe_df(df, feature_names: list) -> pd.DataFrame:
 def univar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
            cut_type=1, n_bin=10, group_cols=[]) -> pd.DataFrame:
     """
-    单变量分布：对 x 进行分组，求每组的y的均值
-    :param x df 中的字段名称
-    :param feature_grid cut_type n_bin
-    :param group_cols 分组统计
-    """
-    if df is None or len(df) == 0:
-        return None
-    # 对x 进行分组； 'lbl', 'lbl_index', 'lbl_left'
-    df = metricutil.get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
-    # 对应的y mean 计算
-    if group_cols is None or len(group_cols) == 0:
-        cls_cols = ['lbl', 'lbl_index', 'lbl_left']
-    else:
-        cls_cols = group_cols + ['lbl', 'lbl_index', 'lbl_left']
-    gp = pd.pivot_table(df, values=y, index=cls_cols,
-                        sort='lbl_index', aggfunc=['count', 'sum'],
-                        fill_value=0, margins=False, observed=True)
-    # 分组计算 y 的数量
-    gp.columns = ['cnt', 'sum']
-    gp['avg'] = np.round(gp['sum'] / gp['cnt'], 3)
-    gp.reset_index(inplace=True)
-    return gp
-
-
-def accumvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
-             cut_type=1, n_bin=10, group_cols=[]) -> pd.DataFrame:
-    """
     变量累计分布 对x 进行分组，然后累计计算每组y的均值和数量
     :param x df 中的字段名称
     :param feature_grid cut_type n_bin
     :param group_cols 分组统计
+    :return cnt sum avg accum_cnt,accum_sum,accum_avg
     """
     if df is None:
         return None
@@ -104,10 +78,10 @@ def accumvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
         # 如果是 cls_cols.extend，则会更新 group_cols
         cls_cols = cls_cols + ['lbl_index', 'lbl', 'lbl_left']
     gp = pd.pivot_table(df, values=y, index=cls_cols,
-                        sort='lbl_index', aggfunc=['count', 'sum'],
+                        sort='lbl_index', aggfunc=['count', 'sum', 'mean'],
                         fill_value=0, margins=False, observed=True)
-    gp.columns = ['cnt', 'sum']
-    gp['avg'] = np.round(gp['sum'] / gp['cnt'], 3)
+    gp.columns = ['cnt', 'sum', 'avg']
+    gp['avg'] = np.round(gp['avg'], 3)
     if group_cols is None or len(group_cols) == 0:
         gp['accum_cnt'] = gp['cnt'].cumsum()
         gp['accum_sum'] = gp['sum'].cumsum()
@@ -120,13 +94,14 @@ def accumvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     return gp
 
 
-def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
+def binary_liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
             cut_type=1, n_bin=10, group_cols=[]) -> pd.DataFrame:
     """
     变量lift 分布，适用于y值二分类,对 x 变量进行分组
     :param y  定义 坏=1   好=0
     :param group_cols 分组统计
     :param feature_grid cut_type[1:等频分布 2:等宽分布] n_bin 分组的参数
+    :return 'cnt', 'cnt_bad', 'rate_bad', 'accum_cnt', 'accum_cnt_bad', 'accum_rate_bad', 'accum_lift_bad'
     """
     if df is None:
         return None
@@ -188,24 +163,23 @@ def liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     return gp[cols]
 
 
-def evaluate_twoscores_lift(df, f1, f2, target, n_bin=10, show_flat=True):
+def evaluate_multiscores_binary_liftvar(df, model_scores:list, target, n_bin=10)->pd.DataFrame:
     """
-    评估2个模型分的联合的lift 变化
-    :param f1 f2 ::: feature_name
-    :param target:
+    评估多个模型分的联合的lift 变化,适用于二分类目标变量的评估
+    :param model_scores:模型分
+    :param target:目标变量，二分类 0，1 变量
     :param show_flat 数据展示模型，True 展开；False 堆叠
-    :return:
+    :return:'cnt', 'rate_bad', 'accum_cnt_rate', 'accum_rate_bad', 'accum_lift_bad'
     """
-    cols = [target, f1, f2]
+    cols = [target]+model_scores
     df = df[cols]
-    df = metricutil.get_bin(df, f1, cut_type=1, n_bin=n_bin)
-    df.rename(columns={'lbl': '%s_lbl' % f1, 'lbl_index': '%s_lbl_index' % f1}, inplace=True)
-    df = metricutil.get_bin(df, f2, cut_type=1, n_bin=n_bin)
-    df.rename(columns={'lbl': '%s_lbl' % f2, 'lbl_index': '%s_lbl_index' % f2}, inplace=True)
-    ix = '%s_lbl' % f1
-    column = '%s_lbl' % f2
-    gp = pd.pivot_table(df, values=[target], index=ix,
-                        columns=column, fill_value=0,
+    # 每个模型分分桶
+    for score in model_scores:
+        df = metricutil.get_bin(df, score, cut_type=1, n_bin=n_bin)
+        df.rename(columns={'lbl': '%s_lbl' % score, 'lbl_index': '%s_lbl_index' % score}, inplace=True)
+    ixes = ['%s_lbl' % f for f in model_scores]
+    # 空值不计入
+    gp = pd.pivot_table(df, values=[target], index=ixes,
                         aggfunc=('count', 'sum', 'mean'), observed=True, )
     gp = gp[target]
     # 所有的数量
@@ -227,8 +201,8 @@ def evaluate_twoscores_lift(df, f1, f2, target, n_bin=10, show_flat=True):
     gp_out = gp_out.merge(t_accum_rate, on=[ix, column], how='outer')
     # 累计所有坏的比例
     t_accum_bad = gp['sum'].cumsum(axis=1).cumsum(axis=0)
-    t_accum_rate_bad = np.round(t_accum_bad/t_accum_cnt,2)
-    t_accum_rate_bad=t_accum_rate_bad.stack().reset_index().rename(columns={0: 'accum_rate_bad'})
+    t_accum_rate_bad = np.round(t_accum_bad / t_accum_cnt, 2)
+    t_accum_rate_bad = t_accum_rate_bad.stack().reset_index().rename(columns={0: 'accum_rate_bad'})
     gp_out = gp_out.merge(t_accum_rate_bad, on=[ix, column], how='outer')
     # 累计坏占所有坏的占比
     t_accum_bad = t_accum_bad / all_bad_cnt
@@ -244,7 +218,9 @@ def evaluate_twoscores_lift(df, f1, f2, target, n_bin=10, show_flat=True):
         #                         columns=[column, 'key'],
         #                         aggfunc=np.mean, sort=False)
         # gp_out = gp_out['value']
-        gp_out = pd.pivot_table(gp_out, values=['cnt', 'rate_bad', 'accum_cnt_rate','accum_rate_bad', 'accum_lift_bad'], index=ix,
+        gp_out = pd.pivot_table(gp_out,
+                                values=['cnt', 'rate_bad', 'accum_cnt_rate', 'accum_rate_bad', 'accum_lift_bad'],
+                                index=ix,
                                 columns=column,
                                 aggfunc=np.mean, sort=False)
     return gp_out

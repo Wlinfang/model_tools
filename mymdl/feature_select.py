@@ -5,10 +5,11 @@ from model_tools.mymdl import metricutil, mdlutil
 from sklearn.feature_selection import f_classif, SelectKBest
 
 
-def filter_avona_classier(df, feature_cols, target):
+def filter_avona_classier(df, feature_cols: list, target: str) -> list:
     """
+    适用于连续特征值&分类目标变量
     方差分析 F检验，返回过滤后的特征列表
-
+    F-value ::is a measure of the statistical significance of the difference between the means of two or more groups.
     """
     skb = SelectKBest(f_classif, k='all')
     skb.fit(df[feature_cols], df[target])
@@ -17,7 +18,7 @@ def filter_avona_classier(df, feature_cols, target):
     return df_pvalue[df_pvalue.pvalue < 0.05].index.tolist()
 
 
-def filter_corr_target(df, feature_cols, target, threld=0.02) -> list:
+def filter_corr_target(df, feature_cols, target, threld=0.1) -> list:
     """
     基于 pearsonr 过滤掉 feature 同 targe 不相关的特征
     拒绝掉  （-threld，threld） 的特征
