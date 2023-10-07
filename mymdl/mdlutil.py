@@ -308,6 +308,7 @@ def evaluate_multi_classier(y_true, y_pred):
     """
     balanced_accuracy = metrics.balanced_accuracy_score(y_true, y_pred, )
     cohen_kappa = metrics.cohen_kappa_score(y_true, y_pred)
+    # show
     cm = metrics.confusion_matrix(y_true, y_pred, normalize='all')
     metrics.ConfusionMatrixDisplay(cm)
     mcc = metrics.matthews_corrcoef(y_true, y_pred)
@@ -316,12 +317,19 @@ def evaluate_multi_classier(y_true, y_pred):
 
 def evaluate_regression(y_true, y_pred):
     """
+    回归评估
     r2
     """
     mse = metrics.mean_squared_error(y_true, y_pred)
     r2 = metrics.r2_score(y_true, y_pred)
     return mse, r2
 
+def evaluate_ranking():
+    """
+    评估排序效果
+    :return:
+    """
+    pass
 
 class Confidence:
     """

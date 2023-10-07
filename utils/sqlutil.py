@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 import datetime
 import json
 
@@ -8,6 +9,39 @@ from pyhive import hive
 import getpass
 import pymongo
 from sqlalchemy import create_engine
+
+from pyhive import hive
+
+
+class HiveEngine:
+    @classmethod
+    def build_hive_conn(cls, ip, port, db_name, user_name, passwd):
+        """
+        获取hive 连接
+        """
+        if user_name is None:
+            hive_con = hive.Connection(host=ip, port=port)
+        else:
+            hive_con = hive.Connection(host=ip, port=port,
+                                       auth="LDAP", username=user_name, database=db_name, password=passwd)
+        instan = HiveEngine()
+        instan.__hive_con = hive_con
+        return instan
+
+    def query_sql(self, sql):
+        cursor = self.__hive_con.cursor()
+        # 执行Hive查询
+        cursor.execute(sql)
+        # 获取查询结果
+        results = cursor.fetchall()
+        cols = np.array(cursor.description)[:, 0].tolist()
+        df = pd.DataFrame.from_records(results, columns=cols)
+        # 关闭连接
+        cursor.close()
+        return df
+
+    def close_hive(self):
+        self.__hive_conn.close()
 
 
 def get_hive_engine(ip, port, db_name, user_name, passwd):
