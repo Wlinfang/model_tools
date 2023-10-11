@@ -1,8 +1,9 @@
 import pandas as pd
 import numpy as np
 from typing import Tuple, List
-from model_tools.mymdl import metricutil, mdlutil
+from model_tools.mymdl import mdlutil
 from sklearn.feature_selection import f_classif, SelectKBest
+from scipy import stats
 
 
 def filter_avona_classier(df, feature_cols: list, target: str) -> list:
@@ -16,25 +17,6 @@ def filter_avona_classier(df, feature_cols: list, target: str) -> list:
     df_pvalue = pd.DataFrame(skb.pvalues_, index=skb.feature_names_in_, columns=['pvalue'])
     # 过滤掉 pvalue
     return df_pvalue[df_pvalue.pvalue < 0.05].index.tolist()
-
-
-def filter_corr_target(df, feature_cols, target, threld=0.1) -> list:
-    """
-    基于 pearsonr 过滤掉 feature 同 targe 不相关的特征
-    拒绝掉  （-threld，threld） 的特征
-    :return:返回 有相关性的特征列表
-    0~0.2 无相关或者积弱
-    0.2~0.4 弱相关
-    0.4~0.6 中等相关
-    0.6~0.8 强相关
-    0.8~1  极强相关
-    """
-    df_corr = df[feature_cols + [target]].corr()
-    df_corr = df_corr[target]
-    df_corr = df_corr[df_corr.index != target]
-    # pearsonr
-    df_corr = df_corr[(df_corr > threld) | (df_corr < -threld)]
-    return df_corr.index.tolist()
 
 
 def filter_all_miss(df, feature_cols):
@@ -105,17 +87,52 @@ def filter_corr_iv(df, feature_cols, target, corr_threold=0.8, iv_threold=0.02) 
     :param iv_threold iv 阈值
     :param df_corr  df_iv
     """
-    df_corr = filter_corr(df, feature_cols, corr_threold)
+
     # 计算iv 值
     iv_dict = {}
     for f in feature_cols:
-        iv_value = metricutil.iv(df, f, target, cut_type=1, n_bin=10)
+        iv_value = mdlutil.iv(df, f, target, cut_type=1, n_bin=10)
         if iv_value < iv_threold:
             continue
         iv_dict[f] = iv_value
     df_iv = pd.DataFrame.from_dict(iv_dict, orient='index', columns=['iv'])
     df_iv = df_iv.reset_index()
+    # 高iv的特征
+    feature_cols = df_iv['index'].unique()
+    df_corr = filter_corr(df, feature_cols, corr_threold)
     # 高相关性的特征剔除
     df_corr = df_corr.merge(df_iv.rename(columns={'index': 'f1', 'iv': 'f1_iv'}), on='f1', how='left')
     df_corr = df_corr.merge(df_iv.rename(columns={'index': 'f2', 'iv': 'f2_iv'}), on='f2', how='left')
     return df_corr, df_iv
+
+
+def filter_corr_target(df, feature_cols, target, threld=0.1, corr_method='pearsonr') -> list:
+    """
+    过滤掉 feature 同 targe 不相关的特征 拒绝掉  （-threld，threld） 的特征
+    计算指标 pearsonr & spearmanr=(变量排序 + pearsonr) & kendalltau(有序性)
+    :param corr_method: pearsonr 、spearmanr 、kendalltau
+    :return:返回 有相关性的特征列表
+    0~0.2 无相关或者积弱
+    0.2~0.4 弱相关
+    0.4~0.6 中等相关
+    0.6~0.8 强相关
+    0.8~1  极强相关
+    """
+    data = []
+    for f in feature_cols:
+        t = df[df[f].notna()]
+        if t.shape[0] < 5:
+            continue
+        if corr_method == 'pearsonr':
+            s1, p1 = stats.pearsonr(t[f], t[target])
+        elif corr_method == 'spearmanr':
+            s1, p1 = stats.spearmanr(df[f], df[target], nan_policy='omit')
+        elif corr_method == 'kendalltau':
+            s1, p1 = stats.kendalltau(df[f], df[target], nan_policy='omit')
+        else:
+            s1, p1 = None, None
+        data.append([f, s1, p1])
+    df_corr = pd.DataFrame(data, columns=['feature_name', 'corr_method', 'pvalue'])
+    # 拒绝
+    df_corr = df_corr[~((df_corr['corr_method'] < threld) & (df_corr['corr_method'] > -threld))]
+    return df_corr.feature_name.tolist()

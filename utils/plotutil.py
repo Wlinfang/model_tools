@@ -61,7 +61,7 @@ def plot_univar_bygroup(df: pd.DataFrame, x: str, y: str,
         fig = plot_univar(df, x, y, title, line_col_color, is_show)
         figs.append(fig)
     else:
-        df['group_cols_str'] = df.apply(lambda x: '::'.join(['{}={}'.format(k, v) for k, v in zip(group_cols, x)]),
+        df['group_cols_str'] = df[group_cols].apply(lambda x: '::'.join(['{}={}'.format(k, v) for k, v in zip(group_cols, x)]),
                                         axis=1)
         group_cols_str = df['group_cols_str'].unique()
         for gcs in group_cols_str:
@@ -134,72 +134,81 @@ def plot_univar_with_bar(df: pd.DataFrame, x: str, y_line: str, y_bar: str,
     return fig
 
 
-def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
-                 title='', f1_title='', f2_title='',
-                 group_col=None,
-                 is_show=True) -> go.Figure:
+def plot_univar_and_pdp(df,x,y,y_pred,n_bin=10,feature_grid=[]):
     """
-    适用于 子图(x1,y1) 子图(x2,y2) 一行2个子图的情况，2个子图均为折线图
-    :param title 整个图的名称； f1_title 第一个子图的名称；f2_title 第二个子图的名称
-    :param group_col:str 分组
-    :return:fig
+    适用于二分类：2个子图，一个是 x-y   一个是 x-y_pred图
+    :return:
     """
-    if df is None:
-        return None
-    df[x1] = df[x1].astype(str)
-    if x2 != x1:
-        df[x2] = df[x2].astype(str)
-    # 一行 两列
-    fig = make_subplots(rows=1, cols=2, subplot_titles=(f1_title, f2_title))
-    if pd.isna(group_col) or len(group_col) == 0:
-        # y_true
-        fig.add_trace(
-            go.Scatter(x=df[x1], y=df[y1], mode='lines+markers'),
-            row=1, col=1
-        )
-        # y_pred
-        fig.add_trace(
-            go.Scatter(x=df[x2], y=df[y2], mode='lines+markers'),
-            row=1, col=2
-        )
-    else:
-        gcs = df[group_col].unique()
-        colors = px.colors.qualitative.Dark24
-        for ix in range(0, len(gcs), 1):
-            gc = gcs[ix]
-            color = colors[ix]
-            tmp = df[df[group_col] == gc]
-            # 单变量折线图
-            fig.add_trace(
-                go.Scatter(x=tmp[x1], y=tmp[y1],
-                           legendgroup='group', name=gc,
-                           hovertext=gc, line=dict(color=color)),
-                row=1, col=1
-            )
-            # lift 图
-            fig.add_trace(
-                go.Scatter(x=tmp[x2], y=tmp[y2], legendgroup='group',
-                           showlegend=False, hovertext=gc, line=dict(color=color)),
-                row=1, col=2
-            )
-    fig.update_yaxes(
-        matches=None,
-    )
-    fig.update_layout(
-        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
-        # 横向图例
-        legend=dict(orientation='h', yanchor="bottom", y=-0.4, xanchor="left", x=0),
-        width=1000,
-        height=1000 * 0.618,
-        xaxis=dict(tickangle=-30),
-        # 第二个子图的横坐标轴
-        xaxis2=dict(tickangle=-30),
-        yaxis=dict(title=y1),
-        yaxis2=dict(title=y2)
-    )
-    if is_show:
-        fig.show()
-    return fig
+    feature_grid = sta
+    mdlutil.univar()
+
+
+# def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
+#                  title='', f1_title='', f2_title='',
+#                  group_col=None,
+#                  is_show=True) -> go.Figure:
+#     """
+#     适用于 子图(x1,y1) 子图(x2,y2) 一行2个子图的情况，2个子图均为折线图
+#     :param title 整个图的名称； f1_title 第一个子图的名称；f2_title 第二个子图的名称
+#     :param group_col:str 分组
+#     :return:fig
+#     """
+#     if df is None:
+#         return None
+#     df[x1] = df[x1].astype(str)
+#     if x2 != x1:
+#         df[x2] = df[x2].astype(str)
+#     # 一行 两列
+#     fig = make_subplots(rows=1, cols=2, subplot_titles=(f1_title, f2_title))
+#     if pd.isna(group_col) or len(group_col) == 0:
+#         # y_true
+#         fig.add_trace(
+#             go.Scatter(x=df[x1], y=df[y1], mode='lines+markers'),
+#             row=1, col=1
+#         )
+#         # y_pred
+#         fig.add_trace(
+#             go.Scatter(x=df[x2], y=df[y2], mode='lines+markers'),
+#             row=1, col=2
+#         )
+#     else:
+#         gcs = df[group_col].unique()
+#         colors = px.colors.qualitative.Dark24
+#         for ix in range(0, len(gcs), 1):
+#             gc = gcs[ix]
+#             color = colors[ix]
+#             tmp = df[df[group_col] == gc]
+#             # 单变量折线图
+#             fig.add_trace(
+#                 go.Scatter(x=tmp[x1], y=tmp[y1],
+#                            legendgroup='group', name=gc,
+#                            hovertext=gc, line=dict(color=color)),
+#                 row=1, col=1
+#             )
+#             # lift 图
+#             fig.add_trace(
+#                 go.Scatter(x=tmp[x2], y=tmp[y2], legendgroup='group',
+#                            showlegend=False, hovertext=gc, line=dict(color=color)),
+#                 row=1, col=2
+#             )
+#     fig.update_yaxes(
+#         matches=None,
+#     )
+#     fig.update_layout(
+#         title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
+#         # 横向图例
+#         legend=dict(orientation='h', yanchor="bottom", y=-0.4, xanchor="left", x=0),
+#         width=1000,
+#         height=1000 * 0.618,
+#         xaxis=dict(tickangle=-30),
+#         # 第二个子图的横坐标轴
+#         xaxis2=dict(tickangle=-30),
+#         yaxis=dict(title=y1),
+#         yaxis2=dict(title=y2)
+#     )
+#     if is_show:
+#         fig.show()
+#     return fig
 
 
 def plot_score_liftvar(df, x_score: str, target, group_cols=[], n_bin=10, feature_grid=[], is_show=False):
@@ -208,7 +217,7 @@ def plot_score_liftvar(df, x_score: str, target, group_cols=[], n_bin=10, featur
     数据为明细数据
     :return fig,gp_lift
     """
-    gp = mdlutil.liftvar(df, x=x_score, y=target, group_cols=group_cols, n_bin=n_bin, feature_grid=feature_grid)
+    gp = mdlutil.binary_liftvar(df, x=x_score, y=target, group_cols=group_cols, n_bin=n_bin, feature_grid=feature_grid)
     # 分组计算 auc,ks,gini
     if group_cols is not None and len(group_cols) > 0:
         gp_auc = df[df[x_score].notna()].groupby(group_cols).apply(

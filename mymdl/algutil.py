@@ -8,7 +8,6 @@ from sklearn.model_selection import StratifiedKFold
 import pydotplus
 import graphviz
 import shap
-from sklearn.multiclass import OneVsRestClassifier
 
 
 def split_train_val(df: pd.DataFrame, split_type=1, split_ratio=0.8, sort_col=None):
