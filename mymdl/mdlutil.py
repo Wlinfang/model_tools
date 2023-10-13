@@ -96,7 +96,7 @@ def get_bin(df: pd.DataFrame, feature_name: str, cut_type=1,
     if pd.api.types.is_numeric_dtype(df[feature_name]):
         # 数字型 左闭右开
         t1['lbl'] = pd.cut(t1[feature_name], feature_grid, include_lowest=True,
-                           right=False, precision=4)
+                           right=False, precision=4,duplicates='drop')
 
     t1['lbl'] = t1['lbl'].astype('category')
     # 则为缺失值
@@ -114,46 +114,7 @@ def get_bin(df: pd.DataFrame, feature_name: str, cut_type=1,
     return t1
 
 
-def psi(data_base: Union[list, np.array, pd.Series],
-        data_test: Union[list, np.array, pd.Series], feature_grid=[], n_bin=10):
-    """
-    支持数值型&类别型，计算的时候，剔除空值
-    :param data_base: 基准值
-    :param data_test: 观察值
-    :param feature_grid 分组参数 如果未指定，则按照等频 n_bin 分组
-    :return psi   >0.25  分布差异明显
-    """
-    if (data_base is None) or (data_test is None):
-        raise ValueError('data error')
-    # 类型转换
-    data_base = pd.DataFrame(data_base, columns=['data'])
-    data_test = pd.DataFrame(data_test, columns=['data'])
-    data_base['data'] = pd.to_numeric(data_base['data'], errors='ignore')
-    data_test['data'] = pd.to_numeric(data_test['data'], errors='ignore')
-    # 去除空值
-    data_base = data_base[data_base['data'].notna()]
-    data_test = data_test[data_test['data'].notna()]
-    if not pd.api.types.is_numeric_dtype(data_base):
-        # 非数字
-        data_base['lbl'] = data_base['data']
-        data_test['lbl'] = data_test['data']
-    else:
-        # 对 data_base 进行分组
-        if feature_grid:
-            feature_grid = get_feature_grid(data_base, cut_type=1, n_bin=n_bin)
-        data_base = get_bin(data_base, 'data', feature_grid=feature_grid)
-        data_test = get_bin(data_test, 'data', feature_grid=feature_grid)
-    # 统计每个区间的分布
-    gp_base = data_base.groupby('lbl')['data'].count().reset_index()
-    gp_test = data_test.groupby('lbl')['data'].count().reset_index()
-    gp_base['rate'] = np.round(gp_base['data'] / data_base.shape[0], 3)
-    gp_test['rate'] = np.round(gp_test['data'] / data_test.shape[0], 3)
-    gp = gp_base.merge(gp_test, on='lbl', how='outer', suffixes=('_base', '_test'))
-    # psi 分组计算求和，分组公式=(base_rate-pre_rate) * ln(base_rate/pre_rate)
-    gp[['rate_base', 'rate_test']].fillna(0, inplace=True)
-    eps = np.finfo(np.float32).eps
-    gp['psi'] = (gp.base_rate - gp.test_rate) * np.log((gp.base_rate + eps) / (gp.test_rate + eps))
-    return np.round(gp['psi'].sum(), 2)
+
 
 
 def woe(df: pd.DataFrame, x: str, y: str, feature_grid=[], cut_type=1, n_bin=10):
@@ -326,7 +287,7 @@ def binary_liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
         # lift = accum_rate_bad / bad_rate
         # 整体bad_rate
         all_bad_rate = np.round(gp['cnt_bad'].sum() / gp['cnt'].sum(), 4)
-        gp['accum_lift_bad'] = np.round(gp['accum_rate_bad'] / all_bad_rate, 3)
+        gp['lift_bad'] = np.round(gp['rate_bad'] / all_bad_rate, 3)
     else:
         gp['accum_cnt'] = gp.groupby(group_cols)['cnt'].cumsum()
         gp['accum_cnt_bad'] = gp.groupby(group_cols)['cnt_bad'].cumsum()
@@ -346,11 +307,11 @@ def binary_liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
         # gp['accum_rate_good_over_allgood'] = np.round(gp['accum_cnt_good'] / gp['all_cnt_good'], 3)
         # lift = bad_over_allbad_rate / bad_rate
         # gp['accum_lift_bad'] = np.round(gp['accum_rate_bad_over_allbad'] / gp['all_rate_bad'], 3)
-        gp['accum_lift_bad'] = np.round(gp['accum_rate_bad'] / gp['all_rate_bad'], 3)
+        gp['lift_bad'] = np.round(gp['rate_bad'] / gp['all_rate_bad'], 3)
         # 删除
         gp.drop(['all_cnt_bad', 'all_cnt', 'all_rate_bad'], axis=1, inplace=True)
     gp.reset_index(inplace=True)
-    cols = cls_cols + ['cnt', 'cnt_bad', 'rate_bad', 'accum_cnt', 'accum_cnt_bad', 'accum_rate_bad', 'accum_lift_bad']
+    cols = cls_cols + ['cnt', 'cnt_bad', 'rate_bad', 'accum_cnt', 'accum_cnt_bad', 'accum_rate_bad', 'lift_bad']
     return gp[cols]
 
 
@@ -382,7 +343,7 @@ def multiscores_binary_liftvar(df, model_scores: list, target, n_bin=10) -> pd.D
     gp['accum_cnt_bad'] = gp['cnt_bad'].cumsum()
     gp['accum_cnt_rate'] = np.round(gp['accum_cnt'] / all_cnt, 2)
     gp['accum_rate_bad'] = np.round(gp['accum_cnt_bad'] / gp['accum_cnt'], 2)
-    gp['accum_lift_bad'] = np.round(gp['accum_rate_bad'] / all_bad_rate, 3)
+    gp['lift_bad'] = np.round(gp['rate_bad'] / all_bad_rate, 3)
     gp=gp.reset_index()
 
     # # 分组数量计算

@@ -13,33 +13,20 @@ class ModelReport:
     适用于模型报告输出
     """
 
-    def __init__(self, estimator, features: Union[list, np.array, pd.Series],
+    def __init__(self, features: Union[list, np.array, pd.Series],
                  feature_dict: dict, y: str, report_file):
         """
-        :param estimator 学习器，必须有 predict_proba() 方法
         :param features:入模的特征名 Union[list, np.array, pd.Series]
         :param feature_dict  特征字典 {'a':'申请次数'}
         :param y 目标变量名
         :param report_file :输出的报告，html 格式
         :return:
         """
-        self.__estimator = estimator
         self.__features = features
         self.__feature_dict = feature_dict
         self.__label = y
         self.__report_file = report_file
         self.__pred = 'y_pred'
-
-    def __predict_proba(self, df):
-        """
-        预测值
-        :param df:
-        :return:
-        """
-        if df is None:
-            return None
-        df[self.__pred] = self.__estimator.predict_proba(df[self.__features])[:, 1]
-        return df
 
     def __stats_univar(self, df, feature_name, group_cols=[], n_bin=10, feature_grid=[]):
         """
@@ -218,7 +205,7 @@ class ModelReport:
                 if is_save:
                     plotutil.save_fig_tohtml(self.__report_file, fig)
                 # pdp
-                fig = plotutil.plot_univar(tmp, x='lbl', y='score_avg', group_col='legend_title',
+                fig = plotutil.plot_univar(tmp, x='lbl', y='score_avg', line_col_color='legend_title',
                                            title='pdp-{}'.format(feature_name),
                                            is_show=is_show)
                 if is_save:
@@ -232,7 +219,7 @@ class ModelReport:
             if is_save:
                 plotutil.save_fig_tohtml(self.__report_file, fig)
             # pdp
-            fig = plotutil.plot_univar(gp, x='lbl', y='score_avg', group_col='legend_title',
+            fig = plotutil.plot_univar(gp, x='lbl', y='score_avg', line_col_color='legend_title',
                                        title='pdp-{}'.format(feature_name),
                                        is_show=is_show)
             if is_save:
@@ -255,7 +242,7 @@ class ModelReport:
             figs.append(fig)
 
     def report_features_liftchart(self, df_test, feature_names: list, group_cols=[], n_bin=10,
-                                 is_show=False, is_save=False):
+                                  is_show=False, is_save=False):
         """
         融合分&组成各个融合分的子分的表现
         :return:
@@ -318,7 +305,7 @@ class ModelReport:
 
         return gp
 
-    def report_feature_liftchart(self,df_test):
+    def report_feature_liftchart(self, df_test):
         """
         :param df_test:
         :return:

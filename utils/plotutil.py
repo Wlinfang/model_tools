@@ -61,8 +61,9 @@ def plot_univar_bygroup(df: pd.DataFrame, x: str, y: str,
         fig = plot_univar(df, x, y, title, line_col_color, is_show)
         figs.append(fig)
     else:
-        df['group_cols_str'] = df[group_cols].apply(lambda x: '::'.join(['{}={}'.format(k, v) for k, v in zip(group_cols, x)]),
-                                        axis=1)
+        df['group_cols_str'] = df[group_cols].apply(
+            lambda x: '::'.join(['{}={}'.format(k, v) for k, v in zip(group_cols, x)]),
+            axis=1)
         group_cols_str = df['group_cols_str'].unique()
         for gcs in group_cols_str:
             tmp = df[df.group_cols_str == gcs]
@@ -134,13 +135,52 @@ def plot_univar_with_bar(df: pd.DataFrame, x: str, y_line: str, y_bar: str,
     return fig
 
 
-def plot_univar_and_pdp(df,x,y,y_pred,n_bin=10,feature_grid=[]):
+def plot_univar_and_pdp(df, x, y_true, y_pred, n_bin=10, feature_grid=[], is_show=False):
     """
     适用于二分类：2个子图，一个是 x-y   一个是 x-y_pred图
-    :return:
+    :return: fig,gp_lift
     """
-    feature_grid = sta
-    mdlutil.univar()
+    # 对x 进行分组
+    df = mdlutil.get_bin(df, x, cut_type=1, n_bin=n_bin, feature_grid=feature_grid)
+    # 每组求y_true & y_pred 的均值
+    gp = df.groupby(['lbl_index', 'lbl', 'lbl_left']).agg(
+        cnt=(y_true, 'count'),
+        cnt_bad=(y_true, 'sum'),
+        rate_bad=(y_true, 'mean'),
+        score_avg=(y_pred, 'mean')
+    ).reset_index()
+    gp['rate_bad'] = np.round(gp['rate_bad'], 3)
+    gp['score_avg'] = np.round(gp['score_avg'], 6)
+    gp['lbl']=gp['lbl'].astype(str)
+    # 画图 x-y_true
+    fig = make_subplots(rows=2, cols=1, subplot_titles=('univar-' + x, 'pdp-' + x))
+    fig.add_trace(
+        go.Scatter(x=gp['lbl'], y=gp['rate_bad'], mode='lines+markers',),
+        row=1, col=1
+    )
+    # y_pred
+    fig.add_trace(
+        go.Scatter(x=gp['lbl'], y=gp['score_avg'], mode='lines+markers'),
+        row=2, col=1
+    )
+    fig.update_yaxes(
+        matches=None,
+    )
+    fig.update_layout(
+        title=dict(y=0.9, x=0.5, xanchor='center', yanchor='top'),
+        # 横向图例
+        legend=dict(orientation='h', yanchor="bottom", y=-0.4, xanchor="left", x=0),
+        width=900,
+        height=900 * 0.62,
+        xaxis=dict(tickangle=-30),
+        # 第二个子图的横坐标轴
+        xaxis2=dict(tickangle=-30),
+        yaxis=dict(title=y_true),
+        yaxis2=dict(title=y_pred)
+    )
+    if is_show:
+        fig.show()
+    return fig, gp
 
 
 # def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
@@ -211,7 +251,7 @@ def plot_univar_and_pdp(df,x,y,y_pred,n_bin=10,feature_grid=[]):
 #     return fig
 
 
-def plot_score_liftvar(df, x_score: str, target, group_cols=[], n_bin=10, feature_grid=[], is_show=False):
+def plot_score_liftvar(df, x_score: str, target, group_cols=[], n_bin=10, feature_grid=[], title='',is_show=False):
     """
     分组lift
     数据为明细数据
@@ -244,8 +284,8 @@ def plot_score_liftvar(df, x_score: str, target, group_cols=[], n_bin=10, featur
     # lift: rate_bad lift
     t1 = gp[['legend_name', 'lbl', 'lbl_index', 'rate_bad']].rename(columns={'rate_bad': 'value'})
     t1['key'] = 'rate_bad'
-    t2 = gp[['legend_name', 'lbl', 'lbl_index', 'accum_lift_bad']].rename(columns={'accum_lift_bad': 'value'})
-    t2['key'] = 'accum_lift_bad'
+    t2 = gp[['legend_name', 'lbl', 'lbl_index', 'lift_bad']].rename(columns={'lift_bad': 'value'})
+    t2['key'] = 'lift_bad'
     t = pd.concat([t1, t2])
     t['lbl'] = t['lbl'].astype(str)
     fig = px.line(t, x='lbl', y='value', color='legend_name',
@@ -259,6 +299,7 @@ def plot_score_liftvar(df, x_score: str, target, group_cols=[], n_bin=10, featur
     fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
     fig.update_layout(
         # 横向图例
+        title=dict(text=title if title!='' else x_score),
         legend=dict(orientation='h', yanchor="bottom", y=-0.5, xanchor="left", x=0),
         xaxis=dict(tickangle=-30),
     )
@@ -285,8 +326,8 @@ def plot_scores_liftvar(df, x_scores: list, target, n_bin=10, is_show=False):
     # lift: rate_bad lift
     t1 = gp[['model_name', 'lbl', 'lbl_index', 'rate_bad']].rename(columns={'rate_bad': 'value'})
     t1['key'] = 'rate_bad'
-    t2 = gp[['model_name', 'lbl', 'lbl_index', 'accum_lift_bad']].rename(columns={'accum_lift_bad': 'value'})
-    t2['key'] = 'accum_lift_bad'
+    t2 = gp[['model_name', 'lbl', 'lbl_index', 'lift_bad']].rename(columns={'lift_bad': 'value'})
+    t2['key'] = 'lift_bad'
     t = pd.concat([t1, t2])
     fig = px.line(t, x='lbl_index', y='value', color='model_name', line_group='model_name', facet_col='key',
                   orientation='h', facet_col_wrap=1,
@@ -347,7 +388,7 @@ def plot_scatter_matrix(df, feature_cols, group_feature_name=None):
         sns.pairplot(df[feature_cols + [group_feature_name]], hue=group_feature_name)
 
 
-def plot_target_scatter_matrix(df, feature_cols, target, group_feature_name=None,is_show=True)->go.Figure:
+def plot_target_scatter_matrix(df, feature_cols, target, group_feature_name=None, is_show=True) -> go.Figure:
     """
     特征同目标变量之间的散点图
     """

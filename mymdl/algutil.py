@@ -61,17 +61,19 @@ def xgboost_fit(df_train, df_val, feature_cols, target, cv_folds=5, max_depth=3,
     """
     # 利用cv 进行调参
     params = {
-        'n_estimators': n_estimators,  # 调参
+        'booster': 'gbtree',
+        'n_estimators': n_estimators,
         'max_depth': max_depth,
         'grow_policy': 'lossguide',  # leaf-wise 生长策略
-        'learning_rate': learning_rate,
+        'max_leaves': 10,
+        'learning_rate': learning_rate,  # [0,1] 0.01~0.2
         'verbosity': 1,  # 日志输出
         'objective': 'binary:logistic',
-        'booster': 'gbtree',
         'gamma': 0.0001,
-        #     'tree_method':'hist',
-        #     'reg_alpha':,
-        #     'reg_lambda':,
+        'tree_method': 'hist',
+        'min_child_weight': 1,  # cv
+        # 'reg_alpha':,# l1
+        # 'reg_lambda': 0.1,  # l2
         'random_state': 1024,
         'eval_metric': 'auc'
     }
@@ -103,9 +105,12 @@ def xgboost_fit(df_train, df_val, feature_cols, target, cv_folds=5, max_depth=3,
         dval_predprob = alg.predict_proba(df_val[feature_cols])[:, 1]
         print("AUC Score (Validation): %f" % metrics.roc_auc_score(df_val[target], dval_predprob))
 
-    # Print Feature Importance:
-    feat_imp = pd.Series(alg.get_booster().get_fscore(), feature_cols).sort_values(ascending=False, na_position='last')
-    feat_imp = feat_imp[feat_imp > 0]
+    # Print Feature Importance: 按照平均增益方式
+    # feat_imp = pd.Series(alg.get_booster().get_fscore(), feature_cols).sort_values(ascending=False, na_position='last')
+    # feat_imp = feat_imp[feat_imp > 0]
+    feat_imp = pd.Series(alg.get_booster().get_score(importance_type='gain'), feature_cols).sort_values(ascending=False,
+                                                                                                        na_position='last')
+    feat_imp = feat_imp[feat_imp.notna()]
 
     return alg, feat_imp
 
