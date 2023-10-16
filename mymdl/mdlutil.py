@@ -287,7 +287,7 @@ def binary_liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
         # lift = accum_rate_bad / bad_rate
         # 整体bad_rate
         all_bad_rate = np.round(gp['cnt_bad'].sum() / gp['cnt'].sum(), 4)
-        gp['lift_bad'] = np.round(gp['rate_bad'] / all_bad_rate, 3)
+        gp['lift_bad'] = np.round(gp['accum_rate_bad'] / all_bad_rate, 3)
     else:
         gp['accum_cnt'] = gp.groupby(group_cols)['cnt'].cumsum()
         gp['accum_cnt_bad'] = gp.groupby(group_cols)['cnt_bad'].cumsum()
@@ -307,7 +307,7 @@ def binary_liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
         # gp['accum_rate_good_over_allgood'] = np.round(gp['accum_cnt_good'] / gp['all_cnt_good'], 3)
         # lift = bad_over_allbad_rate / bad_rate
         # gp['accum_lift_bad'] = np.round(gp['accum_rate_bad_over_allbad'] / gp['all_rate_bad'], 3)
-        gp['lift_bad'] = np.round(gp['rate_bad'] / gp['all_rate_bad'], 3)
+        gp['lift_bad'] = np.round(gp['accum_rate_bad'] / gp['all_rate_bad'], 3)
         # 删除
         gp.drop(['all_cnt_bad', 'all_cnt', 'all_rate_bad'], axis=1, inplace=True)
     gp.reset_index(inplace=True)

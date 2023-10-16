@@ -28,7 +28,7 @@ class ModelReport:
         self.__report_file = report_file
         self.__pred = 'y_pred'
 
-    def __stats_univar(self, df, feature_name, group_cols=[], n_bin=10, feature_grid=[]):
+    def __stats_univar(self, df, feature_name, y_true,y_pred,group_cols=[], n_bin=10, feature_grid=[]):
         """
         统计单个变量的 y_true,y_pred 的情况
         :param feature_name:
@@ -39,9 +39,9 @@ class ModelReport:
         """
         if df is None:
             return None
-        gp_true = mdlutil.univar(df, feature_name, self.__label, feature_grid=feature_grid,
+        gp_true = mdlutil.univar(df, feature_name, y_true, feature_grid=feature_grid,
                                  n_bin=n_bin, cut_type=1, group_cols=group_cols)
-        gp_pred = mdlutil.univar(df, feature_name, self.__pred, feature_grid=feature_grid,
+        gp_pred = mdlutil.univar(df, feature_name, y_pred, feature_grid=feature_grid,
                                  n_bin=n_bin, cut_type=1, group_cols=group_cols)
         if group_cols is None or len(group_cols) == 0:
             cls_col = ['lbl', 'lbl_index', 'lbl_left']
@@ -153,7 +153,7 @@ class ModelReport:
 
         return gp
 
-    def report_feature(self, df_train, df_test, feature_name, group_cols=[], n_bin=10, plot_trte=True,
+    def report_feature(self, df_train, df_test, feature_name, y_true,y_pred,group_cols=[], n_bin=10, plot_trte=True,
                        is_show=False, is_save=False):
         """
         分析单个变量::测试集的情况; feature_name & [y_true,y_pred]
@@ -178,9 +178,9 @@ class ModelReport:
         for df, sample_type in zip([df_train, df_test], ['train', 'test']):
             if df is not None:
                 # 预测分值
-                df = self.__predict_proba(df)
+                # df = self.__predict_proba(df)
                 # 统计数据
-                tmp = self.__stats_univar(df, feature_name, group_cols, n_bin, feature_grid)
+                tmp = self.__stats_univar(df, feature_name,y_true,y_pred, group_cols, n_bin, feature_grid)
                 tmp['sample_type'] = sample_type
                 gp = pd.concat([gp, tmp])
         # group_cols 汇总为1个字段
@@ -227,7 +227,7 @@ class ModelReport:
 
         return gp
 
-    def report_features(self, df_train, df_test, plot_trte=True, group_cols=[], n_bin=10):
+    def report_features(self, df_train, df_test,y_true,y_pred, plot_trte=True, group_cols=[], n_bin=10):
         """
         保存所有的特征 univar + pdp 到 html 中
         :param plot_trte:
@@ -236,7 +236,7 @@ class ModelReport:
         figs = []
         for feature_name in self.__features:
             print(feature_name)
-            fig = self.report_feature(df_train, df_test, feature_name, group_cols=group_cols, n_bin=n_bin,
+            fig = self.report_feature(df_train, df_test, feature_name,y_true,y_pred, group_cols=group_cols, n_bin=n_bin,
                                       plot_trte=plot_trte,
                                       is_show=False, is_save=True)
             figs.append(fig)
