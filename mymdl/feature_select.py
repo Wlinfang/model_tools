@@ -32,6 +32,7 @@ def filter_miss_freq(df, feature_cols, miss_threold=0.9, freq_threold=0.8) -> Li
     """
     过滤缺失值超过 miss_threold 的特征
     过滤众数占比高超过 freq_threold 的特征
+    :return 返回可用的特征
     """
     gp = mdlutil.describe_df(df, feature_cols)
     gp['miss_rate_float'] = gp['miss_rate'].str.replace('%', '')

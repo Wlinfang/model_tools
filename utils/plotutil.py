@@ -317,7 +317,7 @@ def plot_scores_liftvar(df, x_scores: list, target, n_bin=10, is_show=False):
     # 计算每个模型分的lift
     data = []
     for x in x_scores:
-        gp = mdlutil.liftvar(df, x, target, n_bin=n_bin)
+        gp = mdlutil.binary_liftvar(df, x, target, n_bin=n_bin)
         t = df[df[x].notna()]
         cnt, auc, ks, gini = mdlutil.evaluate_binary_classier(t[target], t[x])
         gp['model_name'] = '{}::{}::auc={}::ks={}'.format(x, int(cnt), auc, ks)
