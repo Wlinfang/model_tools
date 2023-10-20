@@ -11,7 +11,7 @@ import pymongo
 from sqlalchemy import create_engine
 
 from pyhive import hive
-
+import pyhdfs
 
 class HiveEngine:
     @classmethod
@@ -220,3 +220,9 @@ def mysql_query(sql, engine_mysql: sqlalchemy.engine.Engine) -> pd.DataFrame:
 
 # spark
 # spark_df.withColumn('label_fst7',F.UserDefinedFunction(lambda obj: 1 if obj >= 7 else 0)(spark_df.fst_overdue_day))
+
+def write_df_to_hdfs(hdfs_path,df):
+    """
+    利用hive 将dataframe 写入 hdfs_path
+    """
+    pass

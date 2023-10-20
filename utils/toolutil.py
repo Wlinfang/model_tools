@@ -32,7 +32,7 @@ def get_md5(s: str) -> str:
     返回字符串的 32位 md5值
     """
     m2 = hashlib.md5()
-    m2.update(s.encode())
+    m2.update(str(s).encode())
     return m2.hexdigest()
 
 
@@ -122,3 +122,14 @@ def del_none(values: Union[list, np.array, pd.Series]) -> np.array:
         # 非数字类型，不进行剔除
         logger.info('%s is %s', (values, e))
     return values
+
+
+def join_list(xs:list):
+    """
+    ','.join(xs) 去空&排序后的处理
+    :return:str
+    """
+    xs=[x for x in xs if not pd.isna(x)]
+    if len(xs)==0:
+        return ''
+    return ','.join(sorted(list(set(xs))))
