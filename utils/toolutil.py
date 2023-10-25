@@ -100,6 +100,36 @@ def parse_week(df: pd.DataFrame, date_name: str, date_name_new: str):
     df[date_name_new] = pd.to_datetime(df[date_name_new]).dt.date
     return df
 
+def cal_diff_days(df,start_date,end_date):
+    """
+    计算 start_date,end_date 之间的天数差，返回diff_days
+    """
+    df[[start_date,end_date]]=df[[start_date,end_date]].apply(pd.to_datetime)
+    df['diff_days'] = (df[end_date] - df[start_date]) / np.timedelta64(1, 'D')
+    return df
+def cal_diff_weeks(df,start_date,end_date):
+    """
+    计算 start_date,end_date 之间的week 差，返回diff_weeks
+    """
+    df[[start_date, end_date]] = df[[start_date, end_date]].apply(pd.to_datetime)
+    df['diff_weeks'] = (df[end_date] - df[start_date]) / np.timedelta64(1, 'W')
+    return df
+def cal_diff_months(df,start_date,end_date):
+    """
+    计算 start_date,end_date 之间的month 差，返回diff_months
+    """
+    df[[start_date, end_date]] = df[[start_date, end_date]].apply(pd.to_datetime)
+    df['diff_months'] = (df[end_date] - df[start_date]) / np.timedelta64(1, 'M')
+    return df
+
+def cal_diff_years(df, start_date, end_date):
+    """
+    计算 start_date,end_date 之间的year 差，返回diff_years
+    """
+    df[[start_date, end_date]] = df[[start_date, end_date]].apply(pd.to_datetime)
+    df['diff_years'] = (df[end_date] - df[start_date]) / np.timedelta64(1, 'Y')
+    return df
+
 
 def del_none(values: Union[list, np.array, pd.Series]) -> np.array:
     """
@@ -124,12 +154,24 @@ def del_none(values: Union[list, np.array, pd.Series]) -> np.array:
     return values
 
 
-def join_list(xs:list):
+def join_list(xs: list):
     """
     ','.join(xs) 去空&排序后的处理
     :return:str
     """
-    xs=[x for x in xs if not pd.isna(x)]
-    if len(xs)==0:
+    xs = [x for x in xs if not pd.isna(x)]
+    if len(xs) == 0:
         return ''
     return ','.join(sorted(list(set(xs))))
+
+
+def parse_cols_to_json(df: pd.DataFrame, feature_cols: list, json_column_name: str) -> pd.DataFrame:
+    """
+    将 df 中的 feature_cols 组合为一个大的json ,且 作为一个column of df
+    """
+    cols = list(set(df.columns) - set(feature_cols))
+    t = pd.DataFrame.to_dict(df[feature_cols], orient='records', index=True)
+    data = {json_column_name: t}
+    t = pd.DataFrame(data, index=df.index)
+    df = df[cols].merge(t, left_index=True, right_index=True, how='inner')
+    return df
