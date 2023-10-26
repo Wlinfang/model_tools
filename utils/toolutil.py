@@ -100,27 +100,33 @@ def parse_week(df: pd.DataFrame, date_name: str, date_name_new: str):
     df[date_name_new] = pd.to_datetime(df[date_name_new]).dt.date
     return df
 
-def cal_diff_days(df,start_date,end_date):
+
+def cal_diff_days(df, start_date, end_date):
     """
     计算 start_date,end_date 之间的天数差，返回diff_days
     """
-    df[[start_date,end_date]]=df[[start_date,end_date]].apply(pd.to_datetime)
+    df[[start_date, end_date]] = df[[start_date, end_date]].apply(pd.to_datetime)
     df['diff_days'] = (df[end_date] - df[start_date]) / np.timedelta64(1, 'D')
     return df
-def cal_diff_weeks(df,start_date,end_date):
+
+
+def cal_diff_weeks(df, start_date, end_date):
     """
     计算 start_date,end_date 之间的week 差，返回diff_weeks
     """
     df[[start_date, end_date]] = df[[start_date, end_date]].apply(pd.to_datetime)
     df['diff_weeks'] = (df[end_date] - df[start_date]) / np.timedelta64(1, 'W')
     return df
-def cal_diff_months(df,start_date,end_date):
+
+
+def cal_diff_months(df, start_date, end_date):
     """
     计算 start_date,end_date 之间的month 差，返回diff_months
     """
     df[[start_date, end_date]] = df[[start_date, end_date]].apply(pd.to_datetime)
     df['diff_months'] = (df[end_date] - df[start_date]) / np.timedelta64(1, 'M')
     return df
+
 
 def cal_diff_years(df, start_date, end_date):
     """
