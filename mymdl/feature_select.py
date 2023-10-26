@@ -21,14 +21,21 @@ def filter_avona_classier(df, feature_cols: list, target: str) -> list:
 
 def filter_all_miss(df, feature_cols: List) -> pd.DataFrame:
     """
-    剔除样本特征全为空的样本
+    1、删除行全为空的
+    2、删除列全为空的
+    3、返回可用的样本
     """
+    # 行为空
     t = df[feature_cols].isnull().T.all()
     df = df[~df.index.isin(t[t == True].index)]
+    # 列为空的
+    t = df[feature_cols].isnull().all()
+    cols = t[t == True].index.tolist()
+    df = df.drop(cols, axis=1)
     return df
 
 
-def filter_miss_freq(df, feature_cols:List, miss_threold=0.9, freq_threold=0.8) -> List:
+def filter_miss_freq(df, feature_cols: List, miss_threold=0.9, freq_threold=0.8) -> List:
     """
     过滤缺失值超过 miss_threold 的特征
     过滤众数占比高超过 freq_threold 的特征
@@ -45,7 +52,7 @@ def filter_miss_freq(df, feature_cols:List, miss_threold=0.9, freq_threold=0.8) 
     return list(set(feature_cols) - set(miss_feature_cols) - set(drop_cols))
 
 
-def filter_corr_iv(df, feature_cols:list, target:str, corr_threold=0.8, iv_threold=0.02) -> list:
+def filter_corr_iv(df, feature_cols: list, target: str, corr_threold=0.8, iv_threold=0.02) -> list:
     """
     1、过滤掉 < iv_threold 的特征
     2、相关性高[ >abs(corr_threold) ]的特征，保留高iv的特征   corr_threold (0,1)
@@ -60,23 +67,31 @@ def filter_corr_iv(df, feature_cols:list, target:str, corr_threold=0.8, iv_threo
         iv_dict[f] = iv_value
     df_iv = pd.DataFrame.from_dict(iv_dict, orient='index', columns=['iv'])
     df_iv = df_iv.reset_index()
+    df_iv.sort_values('iv', ascending=False, inplace=True)
     # 高iv的特征
     feature_cols = df_iv['index'].unique()
     # 计算 corr
-    df_corr=df[feature_cols].corr()
+    df_corr = df[feature_cols].corr()
     mask = np.triu(np.ones_like(df_corr, dtype=bool))
     df_corr = df_corr.mask(mask)
     # 提取高corr 的 特征
-    mask = np.array((df_corr>corr_threold) | (df_corr<-corr_threold))
-    df_corr=df_corr.mask(mask)
-    # 根据corr 从大道小排序，然后
-    return df_corr,df_iv
-
-    # df_corr = filter_corr(df, feature_cols, corr_threold)
-    # # 高相关性的特征剔除
-    # df_corr = df_corr.merge(df_iv.rename(columns={'index': 'f1', 'iv': 'f1_iv'}), on='f1', how='left')
-    # df_corr = df_corr.merge(df_iv.rename(columns={'index': 'f2', 'iv': 'f2_iv'}), on='f2', how='left')
-    # return df_corr, df_iv
+    mask = np.array((df_corr < corr_threold) & (df_corr > -corr_threold) | (df_corr.isna()))
+    df_corr = df_corr.mask(mask)
+    # 根据corr 从大到小排序，然后
+    df_corr = df_corr.stack().reset_index().rename(columns={'level_0': 'f1', 'level_1': 'f2', 0: 'corr'})
+    return_cols = []
+    # 剔除的特征
+    tmp_cols = []
+    for f in feature_cols:
+        if f in tmp_cols:
+            continue
+        # 相关特征且iv低的
+        t = list(
+            set(df_corr[(df_corr['f1'] == f)]['f2'].unique()) | set(df_corr[(df_corr['f2'] == f)]['f1'].unique()))
+        df_corr = df_corr[~((df_corr['f1'].isin(t)) | (df_corr['f2'].isin(t)))]
+        return_cols.append(f)
+        tmp_cols.extend(t)
+    return return_cols
 
 
 def filter_corr_target(df, feature_cols, target, threld=0.1, corr_method='pearsonr') -> list:
