@@ -45,17 +45,12 @@ def filter_miss_freq(df, feature_cols:List, miss_threold=0.9, freq_threold=0.8) 
     return list(set(feature_cols) - set(miss_feature_cols) - set(drop_cols))
 
 
-def filter_corr_iv(df, feature_cols, target, corr_threold=0.8, iv_threold=0.02) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def filter_corr_iv(df, feature_cols:list, target:str, corr_threold=0.8, iv_threold=0.02) -> list:
     """
-    高相关性iv 过滤
-    :param df:
-    :param feature_cols:
-    :param target:目标变量
-    :param corr_threold:相关性阈值 0~1之间
-    :param iv_threold iv 阈值
-    :param df_corr  df_iv
+    1、过滤掉 < iv_threold 的特征
+    2、相关性高[ >abs(corr_threold) ]的特征，保留高iv的特征   corr_threold (0,1)
+    3、返回可用的特征
     """
-
     # 计算iv 值
     iv_dict = {}
     for f in feature_cols:
@@ -67,11 +62,21 @@ def filter_corr_iv(df, feature_cols, target, corr_threold=0.8, iv_threold=0.02) 
     df_iv = df_iv.reset_index()
     # 高iv的特征
     feature_cols = df_iv['index'].unique()
-    df_corr = filter_corr(df, feature_cols, corr_threold)
-    # 高相关性的特征剔除
-    df_corr = df_corr.merge(df_iv.rename(columns={'index': 'f1', 'iv': 'f1_iv'}), on='f1', how='left')
-    df_corr = df_corr.merge(df_iv.rename(columns={'index': 'f2', 'iv': 'f2_iv'}), on='f2', how='left')
-    return df_corr, df_iv
+    # 计算 corr
+    df_corr=df[feature_cols].corr()
+    mask = np.triu(np.ones_like(df_corr, dtype=bool))
+    df_corr = df_corr.mask(mask)
+    # 提取高corr 的 特征
+    mask = np.array((df_corr>corr_threold) | (df_corr<-corr_threold))
+    df_corr=df_corr.mask(mask)
+    # 根据corr 从大道小排序，然后
+    return df_corr,df_iv
+
+    # df_corr = filter_corr(df, feature_cols, corr_threold)
+    # # 高相关性的特征剔除
+    # df_corr = df_corr.merge(df_iv.rename(columns={'index': 'f1', 'iv': 'f1_iv'}), on='f1', how='left')
+    # df_corr = df_corr.merge(df_iv.rename(columns={'index': 'f2', 'iv': 'f2_iv'}), on='f2', how='left')
+    # return df_corr, df_iv
 
 
 def filter_corr_target(df, feature_cols, target, threld=0.1, corr_method='pearsonr') -> list:
