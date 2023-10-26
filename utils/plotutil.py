@@ -151,11 +151,11 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, n_bin=10, feature_grid=[], is_sho
     ).reset_index()
     gp['rate_bad'] = np.round(gp['rate_bad'], 3)
     gp['score_avg'] = np.round(gp['score_avg'], 6)
-    gp['lbl']=gp['lbl'].astype(str)
+    gp['lbl'] = gp['lbl'].astype(str)
     # 画图 x-y_true
     fig = make_subplots(rows=2, cols=1, subplot_titles=('univar-' + x, 'pdp-' + x))
     fig.add_trace(
-        go.Scatter(x=gp['lbl'], y=gp['rate_bad'], mode='lines+markers',),
+        go.Scatter(x=gp['lbl'], y=gp['rate_bad'], mode='lines+markers', ),
         row=1, col=1
     )
     # y_pred
@@ -251,7 +251,7 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, n_bin=10, feature_grid=[], is_sho
 #     return fig
 
 
-def plot_score_liftvar(df, x_score: str, target, group_cols=[], n_bin=10, feature_grid=[], title='',is_show=False):
+def plot_score_liftvar(df, x_score: str, target, group_cols=[], n_bin=10, feature_grid=[], is_show=False):
     """
     分组lift
     数据为明细数据
@@ -290,7 +290,7 @@ def plot_score_liftvar(df, x_score: str, target, group_cols=[], n_bin=10, featur
     t['lbl'] = t['lbl'].astype(str)
     fig = px.line(t, x='lbl', y='value', color='legend_name',
                   line_group='legend_name', facet_col='key',
-                  orientation='h', facet_col_wrap=2, markers=True,
+                  orientation='h', facet_col_wrap=2, markers=True, facet_col_spacing=0.05,
                   width=1000, height=1000 * 0.62, title=x_score)
 
     fig.update_yaxes(
@@ -299,12 +299,14 @@ def plot_score_liftvar(df, x_score: str, target, group_cols=[], n_bin=10, featur
     fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
     fig.update_layout(
         # 横向图例
-        title=dict(text=title if title!='' else x_score),
+        title=dict(text=x_score),
         legend=dict(orientation='h', yanchor="bottom", y=-0.5, xanchor="left", x=0),
         xaxis=dict(tickangle=-30),
+        xaxis2=dict(tickangle=-30),
     )
     if is_show:
         fig.show()
+    gp.drop(['group_cols_str', 'auc_info', 'legend_name'], axis=1, inplace=True)
     return fig, gp
 
 
@@ -346,7 +348,7 @@ def plot_scores_liftvar(df, x_scores: list, target, n_bin=10, is_show=False):
     return fig, gp
 
 
-def plot_corr_heatmap(df, feature_cols:list) -> pd.DataFrame:
+def plot_corr_heatmap(df, feature_cols: list) -> pd.DataFrame:
     """
     相关性矩阵热力图,并返回相关性数据
     """
@@ -362,10 +364,13 @@ def plot_corr_heatmap(df, feature_cols:list) -> pd.DataFrame:
     y = list(df_corr.index)
     z = np.round(np.array(df_corr), decimals=2)
     fig = px.imshow(z, x=x, y=y, zmin=-1, zmax=1,
-                    color_continuous_scale='RdBu', aspect="auto",title='pearson corr',
-                    width=1000,height=1000*0.62)
+                    color_continuous_scale='RdBu', aspect="auto", title='pearson corr',
+                    width=1000, height=1000 * 0.62)
     fig.update_traces(text=z, texttemplate="%{text}")
     fig.update_xaxes(side="bottom")
+    fig.update_layout(
+        xaxis=dict(tickangle=-90),
+    )
     fig.show()
     return df_corr
 
