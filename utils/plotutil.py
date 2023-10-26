@@ -346,11 +346,9 @@ def plot_scores_liftvar(df, x_scores: list, target, n_bin=10, is_show=False):
     return fig, gp
 
 
-def plot_corr_heatmap(df, feature_cols) -> pd.DataFrame:
+def plot_corr_heatmap(df, feature_cols:list) -> pd.DataFrame:
     """
-    相关性矩阵热力图
-    :param df: pd.dataframe
-    :param feature_cols: list
+    相关性矩阵热力图,并返回相关性数据
     """
     if df is None:
         return None
@@ -364,7 +362,8 @@ def plot_corr_heatmap(df, feature_cols) -> pd.DataFrame:
     y = list(df_corr.index)
     z = np.round(np.array(df_corr), decimals=2)
     fig = px.imshow(z, x=x, y=y, zmin=-1, zmax=1,
-                    color_continuous_scale='RdBu', aspect="auto")
+                    color_continuous_scale='RdBu', aspect="auto",title='pearson corr',
+                    width=1000,height=1000*0.62)
     fig.update_traces(text=z, texttemplate="%{text}")
     fig.update_xaxes(side="bottom")
     fig.show()
