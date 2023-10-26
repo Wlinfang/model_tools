@@ -94,12 +94,12 @@ def filter_corr_iv(df, feature_cols: list, target: str, corr_threold=0.8, iv_thr
     return return_cols
 
 
-def filter_corr_target(df, feature_cols, target, threld=0.1, corr_method='pearsonr') -> list:
+def filter_corr_target(df, feature_cols:list, target:str, threld=0.1, corr_method='pearsonr') -> list:
     """
     过滤掉 feature 同 targe 不相关的特征 拒绝掉  （-threld，threld） 的特征
     计算指标 pearsonr & spearmanr=(变量排序 + pearsonr) & kendalltau(有序性)
     :param corr_method: pearsonr 、spearmanr 、kendalltau
-    :return:返回 有相关性的特征列表
+    :return:返回 可用的特征列表
     0~0.2 无相关或者积弱
     0.2~0.4 弱相关
     0.4~0.6 中等相关
@@ -170,9 +170,9 @@ def psi(data_base: Union[list, np.array, pd.Series],
     return np.round(gp['psi'].sum(), 2)
 
 
-def filter_features_psi(df_base, df_test, feature_names, threold=0.3) -> List:
+def filter_features_psi(df_base, df_test, feature_names:list, threold=0.3) -> List:
     """
-    拒绝不稳定的特征，>threold 的特征，返回 <= threold的特征
+    拒绝不稳定的特征 >threold 的特征，返回可用的特征
     """
     left_feature_names = []
     for f in feature_names:
@@ -182,11 +182,12 @@ def filter_features_psi(df_base, df_test, feature_names, threold=0.3) -> List:
     return left_feature_names
 
 
-def filter_psi_iv(df_base, df_test, feature_names, target, psi_threld=0.3, iv_threld=0.2) -> pd.DataFrame:
+def filter_psi_iv(df_base, df_test, feature_names:list, target:str, psi_threld=0.3, iv_threld=0.02) -> pd.DataFrame:
     """
-    计算稳定性和iv
-    拒绝掉 psi > psi_threld 的 数据
-    拒绝掉 abs(iv_base-iv_test) > iv_threld
+    1、过滤掉 psi > psi_threld 的 特征
+    2、过滤掉 iv_test < iv_threld 的特征
+    3、过滤掉 iv_base < iv_threld 的特征
+    返回可用的特征的 psi,iv
     """
     data = []
     for f in feature_names:
@@ -195,6 +196,9 @@ def filter_psi_iv(df_base, df_test, feature_names, target, psi_threld=0.3, iv_th
         iv_test = mdlutil.iv(df_test, f, target)
         data.append([f, p, iv_base, iv_test])
     df_iv = pd.DataFrame(data, columns=['feature_name', 'psi', 'iv_base', 'iv_test'])
-    df_iv['diff_iv'] = np.abs(df_iv['iv_base'] - df_iv['iv_test'])
-    df_iv = df_iv[~((df_iv.diff_iv > iv_threld) | (df_iv['psi'] > psi_threld))]
+    # 过滤掉 psi > psi_threld
+    df_iv=df_iv[~(df_iv['psi']>psi_threld)]
+    # iv 过滤
+    df_iv = df_iv[~(df_iv['iv_test'] < iv_threld)]
+    df_iv = df_iv[~(df_iv['iv_base'] < iv_threld)]
     return df_iv
