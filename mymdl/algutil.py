@@ -106,11 +106,11 @@ def xgboost_fit(df_train, df_val, feature_cols, target, cv_folds=5, max_depth=3,
         print("AUC Score (Validation): %f" % metrics.roc_auc_score(df_val[target], dval_predprob))
 
     # Print Feature Importance: 按照平均增益方式
-    # feat_imp = pd.Series(alg.get_booster().get_fscore(), feature_cols).sort_values(ascending=False, na_position='last')
-    # feat_imp = feat_imp[feat_imp > 0]
-    feat_imp = pd.Series(alg.get_booster().get_score(importance_type='gain'), feature_cols).sort_values(ascending=False,
-                                                                                                        na_position='last')
-    feat_imp = feat_imp[feat_imp.notna()]
+    feat_imp = pd.Series(alg.get_booster().get_fscore(), feature_cols).sort_values(ascending=False, na_position='last')
+    feat_imp = feat_imp[feat_imp > 0]
+    # feat_imp = pd.Series(alg.get_booster().get_score(importance_type='gain'), feature_cols).sort_values(ascending=False,
+    #                                                                                                     na_position='last')
+    # feat_imp = feat_imp[feat_imp.notna()]
 
     return alg, feat_imp
 

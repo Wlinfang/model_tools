@@ -9,8 +9,6 @@ import plotly.graph_objects as go
 from model_tools.utils import toolutil
 import logging
 
-
-
 pd.set_option('display.float_format', lambda x: '%.3f' % x)
 pd.set_option('display.precision', 3)
 pd.set_option('display.max_rows', 2000)
@@ -96,7 +94,7 @@ def get_bin(df: pd.DataFrame, feature_name: str, cut_type=1,
     if pd.api.types.is_numeric_dtype(df[feature_name]):
         # 数字型 左闭右开
         t1['lbl'] = pd.cut(t1[feature_name], feature_grid, include_lowest=True,
-                           right=False, precision=4,duplicates='drop')
+                           right=False, precision=4, duplicates='drop')
 
     t1['lbl'] = t1['lbl'].astype('category')
     # 则为缺失值
@@ -112,9 +110,6 @@ def get_bin(df: pd.DataFrame, feature_name: str, cut_type=1,
     t1.loc[t1.lbl_index == -1, 'lbl_index'] = t1.lbl_index.max() + 1
     t1['lbl_left'] = t1['lbl_left'].astype(str)
     return t1
-
-
-
 
 
 def woe(df: pd.DataFrame, x: str, y: str, feature_grid=[], cut_type=1, n_bin=10):
@@ -207,6 +202,23 @@ def describe_df(df, feature_names: list) -> pd.DataFrame:
             .rename(columns={0.25: '25%', 0.5: '50%', 0.75: '75%'})
         df_num = df_num.merge(tmp, how='outer', left_index=True, right_index=True)
     return df_num
+
+
+def histvar(df, x, feature_grid=[], cut_type=2, n_bin=10, group_cols=[]):
+    """
+    变量x的分布图，默认等宽分布统计
+    """
+    df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
+    cls_cols = group_cols
+    if len(group_cols) == 0:
+        cls_cols = ['lbl']
+    else:
+        # 如果是 cls_cols.extend，则会更新 group_cols
+        cls_cols = cls_cols + ['lbl']
+    gp = df.groupby(cls_cols).size().reset_index().rename(columns={0: 'cnt'})
+    gp['cnt']=gp['cnt'].astype(int)
+    gp['cnt_rate']=np.round(gp['cnt']/df.shape[0],3)
+    return gp
 
 
 def univar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
@@ -344,7 +356,7 @@ def multiscores_binary_liftvar(df, model_scores: list, target, n_bin=10) -> pd.D
     gp['accum_cnt_rate'] = np.round(gp['accum_cnt'] / all_cnt, 2)
     gp['accum_rate_bad'] = np.round(gp['accum_cnt_bad'] / gp['accum_cnt'], 2)
     gp['lift_bad'] = np.round(gp['rate_bad'] / all_bad_rate, 3)
-    gp=gp.reset_index()
+    gp = gp.reset_index()
 
     # # 分组数量计算
     # t_cnt = gp['count']
@@ -430,7 +442,7 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
         fig = go.Figure(data)
         fig.add_annotation(dict(font=dict(color='rgba(0,0,200,0.8)', size=14),
                                 x=ks_max_x,
-                                y=ks+0.05,
+                                y=ks + 0.05,
                                 showarrow=False,
                                 text='ks = ' + str(ks) + '  ',
                                 textangle=0,
@@ -475,12 +487,14 @@ def evaluate_regression(y_true, y_pred):
     r2 = metrics.r2_score(y_true, y_pred)
     return mse, r2
 
+
 def evaluate_ranking():
     """
     评估排序效果
     :return:
     """
     pass
+
 
 class Confidence:
     """

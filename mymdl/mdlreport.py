@@ -14,7 +14,7 @@ class ModelReport:
     """
 
     def __init__(self, features: Union[list, np.array, pd.Series],
-                 feature_dict: dict, y: str, report_file):
+                 feature_dict={}, report_file=''):
         """
         :param features:入模的特征名 Union[list, np.array, pd.Series]
         :param feature_dict  特征字典 {'a':'申请次数'}

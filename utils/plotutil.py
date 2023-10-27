@@ -10,109 +10,132 @@ import plotly.express as px
 from model_tools.mymdl import mdlutil
 
 
-def plot_hists(df, x, bar_col_color=None, n_bins=20) -> go.Figure:
+def plot_hist(df, x, group_cols=[], feature_grid=[], n_bin=20, title='', is_show=False):
     """
-    概率密度图
-    :param bar_col_color column of df
+    概率密度图 显示数量+比例图，等宽分布
+    左y: 比例；；右y:数量
     """
-    fig = px.histogram(df, x=x, nbins=n_bins, histnorm='percent', color=bar_col_color,
-                       barmode='group', opacity=0.7)
-    fig.update_layout(bargap=0.2)
-    return fig
-
-
-def plot_bar(df: pd.DataFrame, x: str, y: str,
-             title='', group_col=None, is_show=False) -> go.Figure:
-    """
-    单变量 柱形图
-    :param group_col_color:分组，不同的线不同的颜色
-    :param is_show:
-    :return:
-    """
-    df[x] = df[x].astype(str)
-    if pd.isna(group_col) or len(group_col) == 0:
-        fig = px.bar(df, x=x, y=y, barmode='group')
+    gp = mdlutil.histvar(df, x, feature_grid, cut_type=2, n_bin=n_bin, group_cols=group_cols)
+    if group_cols is None or len(group_cols) == 0:
+        gp['group_cols_str'] = ''
     else:
-        fig = px.bar(df, x=x, y=y, color=group_col, barmode='group')
+        gp['group_cols_str'] = gp[group_cols].apply(
+            lambda xx: '::'.join(['{}={}'.format(k, v) for k, v in zip(group_cols, xx)]),
+            axis=1)
+    gp['lbl'] = gp['lbl'].astype(str)
+    # 左y line     # 右y bar
+    gcs = gp['group_cols_str'].unique()
+    colors = px.colors.qualitative.Dark24
+    data = []
+    for ix in range(0, len(gcs), 1):
+        gc = gcs[ix]
+        color = colors[ix]
+        tmp = gp[gp['group_cols_str'] == gc]
+
+        t1 = go.Scatter(x=tmp['lbl'], y=tmp['cnt_rate'], mode='lines+markers',
+                        name=gc, line=dict(color=color),
+                        hovertemplate='%{name}<br>lbl=%{x}<br>cnt_rate=%{y}',
+                        text='cnt_rate', textposition='bottom right',
+                        legendgroup=gc, showlegend=False)
+
+        t2 = go.Bar(x=tmp['lbl'], y=tmp['cnt'], name=gc, opacity=0.5, marker=dict(color=color),
+                    hovertemplate='%{name}<br>lbl=%{x}<br>cnt=%{y}',
+                    yaxis='y2', legendgroup=gc, showlegend=True)
+
+        data.extend([t1, t2])
+    fig = go.Figure(data=data)
     fig.update_layout(
-        title=dict(text=title, y=0.95, x=0.5, xanchor='center', yanchor='top'),
-        barmode='group',
-        bargap=0.8,  # 组间距离
-        bargroupgap=0.2,  # 组内距离
+        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
+        xaxis=dict(title=x, tickangle=-15),
+        yaxis=dict(title='cnt_rate', zeroline=True),
+        yaxis2=dict(title='cnt', anchor='x', overlaying='y', zeroline=True, side='right'),
+        legend=dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h'),
+        # bargap=0.8,  # 组间距离
+        bargroupgap=0.05,  # 组内距离
         width=900,
         height=900 * 0.618
     )
     if is_show:
         fig.show()
-    return fig
+    return fig, gp
 
 
-def plot_univar_bygroup(df: pd.DataFrame, x: str, y: str,
-                        title='', line_col_color=None, group_cols=[], is_show=False) -> List[go.Figure]:
+def plot_scatter(df, x, y, group_cols=[], is_show=False):
     """
-    各个维度画图
-    :param line_col_color: str 在同一个图上 多个折线区分
-    :param group_cols : list 分为多个图
-    :param is_show:
-    :return:
+    趋势线：x相对于y的点图+趋势线，适用于x,y均为连续性变量
+    返回 fig
     """
-    figs = []
     if group_cols is None or len(group_cols) == 0:
-        fig = plot_univar(df, x, y, title, line_col_color, is_show)
-        figs.append(fig)
+        df['group_cols_str'] = ''
     else:
         df['group_cols_str'] = df[group_cols].apply(
-            lambda x: '::'.join(['{}={}'.format(k, v) for k, v in zip(group_cols, x)]),
+            lambda xx: '::'.join(['{}={}'.format(k, v) for k, v in zip(group_cols, xx)]),
             axis=1)
-        group_cols_str = df['group_cols_str'].unique()
-        for gcs in group_cols_str:
-            tmp = df[df.group_cols_str == gcs]
-            fig = plot_univar(tmp, x, y, gcs + ':::' + title, line_col_color=line_col_color, is_show=is_show)
-            figs.append(fig)
-    return figs
-
-
-def plot_univar(df: pd.DataFrame, x: str, y: str,
-                title='', line_col_color=None, is_show=False) -> go.Figure:
-    """
-    单变量 折线图
-    :param df:
-    :param line_col_color str 同一个图上多条折线
-    :param is_show:
-    :return:
-    """
-    df[x] = df[x].astype(str)
-    fig = px.line(df, x=x, y=y, color=line_col_color, markers=True,
-                  symbol=line_col_color, orientation='h', title=title, width=900, height=900 * 0.62)
-    fig.update_layout(legend=dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h'),
-                      xaxis=dict(tickangle=-45), yaxis=dict(zeroline=True))
+    fig = px.scatter(df, x=x, y=y, trendline="ols", color='group_cols_str')
     if is_show:
         fig.show()
     return fig
 
 
+def plot_univar(df: pd.DataFrame, x: str, y: str, group_cols=[], feature_grid=[], n_bin=10, cut_type=1, title='',
+                is_show=False):
+    """
+    x相对于y的分布图 对x进行分桶，对y区间进行取均值
+    返回 fig,gp
+    """
+    # 统计
+    gp = mdlutil.univar(df, x, y, feature_grid, cut_type, n_bin, group_cols)
+    if group_cols is None or len(group_cols) == 0:
+        gp['group_cols_str'] = ''
+    else:
+        gp['group_cols_str'] = gp[group_cols].apply(
+            lambda xx: '::'.join(['{}={}'.format(k, v) for k, v in zip(group_cols, xx)]),
+            axis=1)
+    x_order = gp[['lbl', 'lbl_index']].drop_duplicates()
+    x_order = x_order['lbl']
+    gp['lbl'] = gp['lbl'].astype(str)
+    # symbol legend 图表变化
+    fig = px.line(gp, x='lbl', y='avg', color='group_cols_str', markers=True,
+                  hover_data=['group_cols_str', 'lbl', 'avg', 'cnt'],
+                  labels={'lbl': x, 'avg': 'avg({})'.format(y)},
+                  symbol='group_cols_str', orientation='h', width=900,
+                  height=900 * 0.62)
+    fig.update_layout(
+        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
+        legend=dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h'),
+        xaxis=dict(tickangle=-45), yaxis=dict(zeroline=True))
+    gp.drop(['group_cols_str'], axis=1, inplace=True)
+    if is_show:
+        fig.show()
+    return fig, gp
+
+
 def plot_univar_with_bar(df: pd.DataFrame, x: str, y_line: str, y_bar: str,
-                         group_col=None, title='', is_show=False) -> go.Figure:
+                         group_cols=[], title='', is_show=False) -> go.Figure:
     """
     单变量分布图:柱形图+折线图的联合分布
-    :param y_line  折线图
-    :param y_bar 柱形图
-    :param group_col 分组
-    :param title:图片名字
+    左y:y_line   右y : y_bar
     """
     data = []
+    if group_cols is None or len(group_cols) == 0:
+        df['group_cols_str'] = ''
+    else:
+        df['group_cols_str'] = df[group_cols].apply(
+            lambda xx: '::'.join(['{}={}'.format(k, v) for k, v in zip(group_cols, xx)]),
+            axis=1)
     df[x] = df[x].astype(str)
-    if group_col is None or len(group_col) == 0:
+
+    if group_cols is None or len(group_cols) == 0:
         t1 = go.Bar(x=df[x], y=df[y_bar], name=y_bar, opacity=0.5)
         t2 = go.Scatter(x=df[x], y=df[y_line], xaxis='x', yaxis='y2', name=y_line)
         data = [t1, t2]
     else:
-        gcs = df[group_col].unique()
+        gcs = df[group_cols].unique()
         colors = px.colors.qualitative.Dark24
         for ix in range(0, len(gcs), 1):
             gc = gcs[ix]
             color = colors[ix]
-            tmp = df[df[group_col] == gc]
+            tmp = df[df[group_cols] == gc]
             t1 = go.Bar(x=tmp[x], y=tmp[y_bar], name=gc, opacity=0.5, marker=dict(color=color),
                         legendgroup='group')
             t2 = go.Scatter(x=tmp[x], y=tmp[y_line], xaxis='x',
@@ -451,23 +474,6 @@ def show_dash(figs):
     graphs = [dcc.Graph(figure=fig) for fig in figs]
     app.layout = html.Div(graphs)
     app.run_server(debug=True, use_reloader=False)  # Turn off reloader if inside Jupyter
-
-#
-# def plot_corr(df, feature_name_list):
-#     """
-#     热力图：皮尔逊系数计算
-#     """
-#     plt.figure(figsize=(8, 6))
-#     corr = np.corrcoef(df[feature_name_list], rowvar=False)
-#     # 以corr的形状生成一个全为0的矩阵
-#     mask = np.zeros_like(corr)
-#     # 将mask的对角线及以上设置为True
-#     # 这部分就是对应要被遮掉的部分
-#     mask[np.triu_indices_from(mask, k=1)] = True
-#     with sn.axes_style("white"):
-#         sn.heatmap(corr, mask=mask, fmt='.2f', annot=True, cmap="RdBu_r")
-#     plt.title('person corr')
-#     plt.show()
 
 #
 # def rgb_to_hex(rgb):
