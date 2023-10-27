@@ -52,11 +52,11 @@ def filter_miss_freq(df, feature_cols: List, miss_threold=0.9, freq_threold=0.8)
     return list(set(feature_cols) - set(miss_feature_cols) - set(drop_cols))
 
 
-def filter_corr_iv(df, feature_cols: list, target: str, corr_threold=0.8, iv_threold=0.02) -> list:
+def filter_corr_iv(df, feature_cols: list, target: str, corr_threold=0.8, iv_threold=0.02) -> pd.DataFrame:
     """
     1、过滤掉 < iv_threold 的特征
     2、相关性高[ >abs(corr_threold) ]的特征，保留高iv的特征   corr_threold (0,1)
-    3、返回可用的特征
+    3、返回可用的特征的iv 信息
     """
     # 计算iv 值
     iv_dict = {}
@@ -91,7 +91,7 @@ def filter_corr_iv(df, feature_cols: list, target: str, corr_threold=0.8, iv_thr
         df_corr = df_corr[~((df_corr['f1'].isin(t)) | (df_corr['f2'].isin(t)))]
         return_cols.append(f)
         tmp_cols.extend(t)
-    return return_cols
+    return df_iv[df_iv['index'].isin(return_cols)]
 
 
 def filter_corr_target(df, feature_cols:list, target:str, threld=0.1, corr_method='pearsonr') -> list:

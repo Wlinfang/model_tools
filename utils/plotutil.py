@@ -348,6 +348,22 @@ def plot_scores_liftvar(df, x_scores: list, target, n_bin=10, is_show=False):
     return fig, gp
 
 
+def plot_train_test_liftvar(df_train, df_test, x: str, target: str, group_cols=[], n_bin=10, feature_grid=[],
+                            is_show=False):
+    """
+    基于训练集分桶，lift 表现
+    返回 fig,gp
+    """
+    if len(feature_grid) == 0:
+        feature_grid = mdlutil.get_feature_grid(df_train[x], cut_type=1, n_bin=n_bin)
+    group_cols.append('sample_type')
+    cols = [x, target] + group_cols
+    df_train['sample_type'] = 'train'
+    df_test['sample_type'] = 'test'
+    t = pd.concat([df_train[cols], df_test[cols]])
+    return plot_score_liftvar(t, x, target, group_cols, feature_grid=feature_grid, is_show=is_show)
+
+
 def plot_corr_heatmap(df, feature_cols: list) -> pd.DataFrame:
     """
     相关性矩阵热力图,并返回相关性数据
