@@ -16,47 +16,7 @@ def plot_hist(df, x, group_cols=[], feature_grid=[], n_bin=20, title='', is_show
     左y: 比例；；右y:数量
     """
     gp = mdlutil.histvar(df, x, feature_grid, cut_type=2, n_bin=n_bin, group_cols=group_cols)
-    if group_cols is None or len(group_cols) == 0:
-        gp['group_cols_str'] = ''
-    else:
-        gp['group_cols_str'] = gp[group_cols].apply(
-            lambda xx: '::'.join(['{}={}'.format(k, v) for k, v in zip(group_cols, xx)]),
-            axis=1)
-    gp['lbl'] = gp['lbl'].astype(str)
-    # 左y line     # 右y bar
-    gcs = gp['group_cols_str'].unique()
-    colors = px.colors.qualitative.Dark24
-    data = []
-    for ix in range(0, len(gcs), 1):
-        gc = gcs[ix]
-        color = colors[ix]
-        tmp = gp[gp['group_cols_str'] == gc]
-
-        t1 = go.Scatter(x=tmp['lbl'], y=tmp['cnt_rate'], mode='lines+markers',
-                        name=gc, line=dict(color=color),
-                        hovertemplate='%{name}<br>lbl=%{x}<br>cnt_rate=%{y}',
-                        text='cnt_rate', textposition='bottom right',
-                        legendgroup=gc, showlegend=False)
-
-        t2 = go.Bar(x=tmp['lbl'], y=tmp['cnt'], name=gc, opacity=0.5, marker=dict(color=color),
-                    hovertemplate='%{name}<br>lbl=%{x}<br>cnt=%{y}',
-                    yaxis='y2', legendgroup=gc, showlegend=True)
-
-        data.extend([t1, t2])
-    fig = go.Figure(data=data)
-    fig.update_layout(
-        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
-        xaxis=dict(title=x, tickangle=-15),
-        yaxis=dict(title='cnt_rate', zeroline=True),
-        yaxis2=dict(title='cnt', anchor='x', overlaying='y', zeroline=True, side='right'),
-        legend=dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h'),
-        # bargap=0.8,  # 组间距离
-        bargroupgap=0.05,  # 组内距离
-        width=900,
-        height=900 * 0.618
-    )
-    if is_show:
-        fig.show()
+    fig = plot_line_with_bar(gp, 'lbl', y_line='cnt_rate', y_bar='cnt', group_cols=group_cols, title=title, is_show=is_show)
     return fig, gp
 
 
@@ -77,7 +37,7 @@ def plot_scatter(df, x, y, group_cols=[], is_show=False):
     return fig
 
 
-def plot_univar(df: pd.DataFrame, x: str, y: str, group_cols=[], feature_grid=[], n_bin=10, cut_type=1, title='',
+def plot_univar(df: pd.DataFrame, x: str, y: str, group_cols=[], feature_grid=[],  cut_type=1, n_bin=10,title='',
                 is_show=False):
     """
     x相对于y的分布图 对x进行分桶，对y区间进行取均值
@@ -85,38 +45,21 @@ def plot_univar(df: pd.DataFrame, x: str, y: str, group_cols=[], feature_grid=[]
     """
     # 统计
     gp = mdlutil.univar(df, x, y, feature_grid, cut_type, n_bin, group_cols)
-    if group_cols is None or len(group_cols) == 0:
-        gp['group_cols_str'] = ''
-    else:
-        gp['group_cols_str'] = gp[group_cols].apply(
-            lambda xx: '::'.join(['{}={}'.format(k, v) for k, v in zip(group_cols, xx)]),
-            axis=1)
-    x_order = gp[['lbl', 'lbl_index']].drop_duplicates()
-    x_order = x_order['lbl']
-    gp['lbl'] = gp['lbl'].astype(str)
-    # symbol legend 图表变化
-    fig = px.line(gp, x='lbl', y='avg', color='group_cols_str', markers=True,
-                  hover_data=['group_cols_str', 'lbl', 'avg', 'cnt'],
-                  labels={'lbl': x, 'avg': 'avg({})'.format(y)},
-                  symbol='group_cols_str', orientation='h', width=900,
-                  height=900 * 0.62)
+    fig = plot_line_with_bar(gp,x='lbl',y_line='avg',y_bar='cnt',group_cols=group_cols,title=title,is_show=False)
     fig.update_layout(
-        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
-        legend=dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h'),
-        xaxis=dict(tickangle=-45), yaxis=dict(zeroline=True))
-    gp.drop(['group_cols_str'], axis=1, inplace=True)
+        yaxis=dict(title=y),
+        xaxis=dict(title=x)
+    )
     if is_show:
         fig.show()
-    return fig, gp
+    return fig,gp
 
 
-def plot_univar_with_bar(df: pd.DataFrame, x: str, y_line: str, y_bar: str,
-                         group_cols=[], title='', is_show=False) -> go.Figure:
+def plot_line_with_bar(df, x: str, y_line: str, y_bar: str, group_cols=[], title='', is_show=False) -> go.Figure:
     """
-    单变量分布图:柱形图+折线图的联合分布
-    左y:y_line   右y : y_bar
+    数据分布显示：x:区间 左y 折线；右y:柱形图
+    返回 fig
     """
-    data = []
     if group_cols is None or len(group_cols) == 0:
         df['group_cols_str'] = ''
     else:
@@ -124,35 +67,37 @@ def plot_univar_with_bar(df: pd.DataFrame, x: str, y_line: str, y_bar: str,
             lambda xx: '::'.join(['{}={}'.format(k, v) for k, v in zip(group_cols, xx)]),
             axis=1)
     df[x] = df[x].astype(str)
+    # 左y line     # 右y bar
+    gcs = df['group_cols_str'].unique()
+    colors = px.colors.qualitative.Dark24
+    data = []
+    for ix in range(0, len(gcs), 1):
+        gc = gcs[ix]
+        color = colors[ix]
+        tmp = df[df['group_cols_str'] == gc]
 
-    if group_cols is None or len(group_cols) == 0:
-        t1 = go.Bar(x=df[x], y=df[y_bar], name=y_bar, opacity=0.5)
-        t2 = go.Scatter(x=df[x], y=df[y_line], xaxis='x', yaxis='y2', name=y_line)
-        data = [t1, t2]
-    else:
-        gcs = df[group_cols].unique()
-        colors = px.colors.qualitative.Dark24
-        for ix in range(0, len(gcs), 1):
-            gc = gcs[ix]
-            color = colors[ix]
-            tmp = df[df[group_cols] == gc]
-            t1 = go.Bar(x=tmp[x], y=tmp[y_bar], name=gc, opacity=0.5, marker=dict(color=color),
-                        legendgroup='group')
-            t2 = go.Scatter(x=tmp[x], y=tmp[y_line], xaxis='x',
-                            yaxis='y2', name=gc, line=dict(color=color),
-                            legendgroup='group', showlegend=False)
-            data.extend([t1, t2])
-    layout = go.Layout(
+        t1 = go.Scatter(x=tmp[x], y=tmp[y_line], mode='lines+markers',
+                        name=gc, line=dict(color=color),
+                        hovertemplate=gc + '<br><br>' + x + '=%{x}<br>' + y_line + '=%{y}<extra></extra>',
+                        legendgroup=gc, showlegend=False)
+
+        t2 = go.Bar(x=tmp[x], y=tmp[y_bar], name=gc, opacity=0.5, marker=dict(color=color),
+                    hovertemplate=gc + '<br><br>' + x + '=%{x}<br>' + y_bar + '=%{y}<extra></extra>',
+                    yaxis='y2', legendgroup=gc, showlegend=True)
+
+        data.extend([t1, t2])
+    fig = go.Figure(data=data)
+    fig.update_layout(
         title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
         xaxis=dict(title=x, tickangle=-15),
-        yaxis=dict(title=y_bar, zeroline=True),
-        yaxis2=dict(title=y_line, anchor='x', overlaying='y', zeroline=True, side='right'),
-        # legend=dict(yanchor="top", y=1.2, xanchor="right", x=1),
+        yaxis=dict(title=y_line, zeroline=True),
+        yaxis2=dict(title=y_bar, anchor='x', overlaying='y', zeroline=True, side='right'),
         legend=dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h'),
+        # bargap=0.8,  # 组间距离
+        bargroupgap=0.05,  # 组内距离
         width=900,
         height=900 * 0.618
     )
-    fig = go.Figure(data=data, layout=layout)
     if is_show:
         fig.show()
     return fig
