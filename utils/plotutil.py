@@ -87,7 +87,16 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, group_cols=[], feature_grid=[], c
     gp['score_avg'] = np.round(gp['score_avg'], 6)
     gp['lbl'] = gp['lbl'].astype(str)
     # 画图 x-y_true
-    fig = make_subplots(rows=2, cols=1, subplot_titles=('univar-' + title, 'pdp-' + title))
+    fig = make_subplots(rows=2, cols=1, subplot_titles=('univar-' + title, 'pdp-' + title),
+                        specs=[
+                            [{"secondary_y": True}],
+                            [{"secondary_y": False}]
+                        ],
+                        shared_xaxes="all",
+                        # shared_yaxes="all",
+                        vertical_spacing=0.06,
+                        horizontal_spacing=0.04
+                        )
     gcs = gp['group_cols_str'].unique()
     colors = px.colors.qualitative.Dark24
     for ix in range(0, len(gcs), 1):
@@ -99,27 +108,23 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, group_cols=[], feature_grid=[], c
                        name=gc, line=dict(color=color),
                        hovertemplate=gc + '<br><br>lbl=%{x}<br>rate_bad=%{y}<extra></extra>',
                        legendgroup=gc, showlegend=False),
-            row=1, col=1
+            row=1, col=1, secondary_y=False
         )
         fig.add_trace(
             go.Bar(x=tmp['lbl'], y=tmp['cnt'], name=gc, opacity=0.5, marker=dict(color=color),
                    hovertemplate=gc + '<br><br>lbl=%{x}<br>cnt=%{y}<extra></extra>',
                    yaxis='y2', legendgroup=gc, showlegend=False),
-            row=1, col=1
+            row=1, col=1, secondary_y=True
         )
         # x:y_pred
         fig.add_trace(
             go.Scatter(x=tmp['lbl'], y=tmp['score_avg'], mode='lines+markers',
                        name=gc, line=dict(color=color),
                        hovertemplate=gc + '<br><br>lbl=%{x}<br>score_avg=%{y}<extra></extra>',
+                       yaxis='y3',
                        legendgroup=gc, showlegend=True),
-            row=2, col=1
+            row=2, col=1, secondary_y=False
         )
-    fig.update_traces(row=1, col=1, secondary_y=True, overwrite=True,
-                      xaxis=dict(tickangle=-30),
-                      yaxis=dict(title=y_true, side='left'),
-                      yaxis2=dict(title='cnt', anchor='x', overlaying='y', zeroline=True, side='right'), )
-    # fig.update_traces(row=2,col=1,secondary_y=False,xaxis=dict(tickangle=-30),yaxis=dict(title=y_pred),)
     fig.update_yaxes(
         matches=None,
     )
@@ -127,6 +132,11 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, group_cols=[], feature_grid=[], c
         title=dict(y=0.9, x=0.5, xanchor='center', yanchor='top'),
         # 横向图例
         legend=dict(orientation='h', yanchor="bottom", y=-0.4, xanchor="left", x=0),
+        xaxis=dict(visible=False),
+        xaxis2=dict(title=x, tickangle=-30),
+        yaxis=dict(title=y_true, zeroline=True,range=[0,gp['rate_bad'].max()+0.001]),
+        yaxis2=dict(title='cnt', zeroline=True),
+        yaxis3=dict(title=y_pred, zeroline=True),
         width=900,
         height=900 * 0.62
     )
