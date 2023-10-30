@@ -16,11 +16,12 @@ def plot_hist(df, x, group_cols=[], feature_grid=[], n_bin=20, title='', is_show
     左y: 比例；；右y:数量
     """
     gp = mdlutil.histvar(df, x, feature_grid, cut_type=2, n_bin=n_bin, group_cols=group_cols)
-    fig = plot_line_with_bar(gp, 'lbl', y_line='cnt_rate', y_bar='cnt', group_cols=group_cols, title=title, is_show=is_show)
+    fig = plot_line_with_bar(gp, 'lbl', y_line='cnt_rate', y_bar='cnt', group_cols=group_cols, title=title,
+                             is_show=is_show)
     return fig, gp
 
 
-def plot_scatter(df, x, y, group_cols=[], is_show=False):
+def plot_scatter(df, x: str, y: str, group_cols=[], is_show=False) -> go.Figure:
     """
     趋势线：x相对于y的点图+趋势线，适用于x,y均为连续性变量
     返回 fig
@@ -37,7 +38,7 @@ def plot_scatter(df, x, y, group_cols=[], is_show=False):
     return fig
 
 
-def plot_univar(df: pd.DataFrame, x: str, y: str, group_cols=[], feature_grid=[],  cut_type=1, n_bin=10,title='',
+def plot_univar(df: pd.DataFrame, x: str, y: str, group_cols=[], feature_grid=[], cut_type=1, n_bin=10, title='',
                 is_show=False):
     """
     x相对于y的分布图 对x进行分桶，对y区间进行取均值
@@ -45,14 +46,117 @@ def plot_univar(df: pd.DataFrame, x: str, y: str, group_cols=[], feature_grid=[]
     """
     # 统计
     gp = mdlutil.univar(df, x, y, feature_grid, cut_type, n_bin, group_cols)
-    fig = plot_line_with_bar(gp,x='lbl',y_line='avg',y_bar='cnt',group_cols=group_cols,title=title,is_show=False)
+    fig = plot_line_with_bar(gp, x='lbl', y_line='avg', y_bar='cnt', group_cols=group_cols, title=title, is_show=False)
     fig.update_layout(
         yaxis=dict(title=y),
         xaxis=dict(title=x)
     )
     if is_show:
         fig.show()
-    return fig,gp
+    return fig, gp
+
+
+def plot_univar_and_pdp(df, x, y_true, y_pred, group_cols=[], feature_grid=[], cut_type=1, n_bin=10, title='',
+                        is_show=False):
+    """
+    适用于二分类：2个子图，一个是 x:y_true   一个是 x:y_pred
+    返回 fig,gp
+    """
+    # 对x 进行分组
+    df = mdlutil.get_bin(df, x, cut_type=1, n_bin=n_bin, feature_grid=feature_grid)
+    if group_cols is None or len(group_cols) == 0:
+        # 每组求y_true & y_pred 的均值
+        gp = df.groupby(['lbl']).agg(
+            cnt=(y_true, 'count'),
+            cnt_bad=(y_true, 'sum'),
+            rate_bad=(y_true, 'mean'),
+            score_avg=(y_pred, 'mean')
+        ).reset_index()
+        gp['group_cols_str'] = ''
+    else:
+        gp = df.groupby(group_cols + ['lbl']).agg(
+            cnt=(y_true, 'count'),
+            cnt_bad=(y_true, 'sum'),
+            rate_bad=(y_true, 'mean'),
+            score_avg=(y_pred, 'mean')
+        ).reset_index()
+        gp['group_cols_str'] = gp[group_cols].apply(
+            lambda xx: '::'.join(['{}={}'.format(k, v) for k, v in zip(group_cols, xx)]),
+            axis=1)
+    gp['rate_bad'] = np.round(gp['rate_bad'], 3)
+    gp['score_avg'] = np.round(gp['score_avg'], 6)
+    gp['lbl'] = gp['lbl'].astype(str)
+    # 画图 x-y_true
+    fig = make_subplots(rows=2, cols=1, subplot_titles=('univar-' + title, 'pdp-' + title))
+    gcs = gp['group_cols_str'].unique()
+    colors = px.colors.qualitative.Dark24
+    for ix in range(0, len(gcs), 1):
+        gc = gcs[ix]
+        color = colors[ix]
+        tmp = gp[gp['group_cols_str'] == gc]
+        fig.add_trace(
+            go.Scatter(x=tmp['lbl'], y=tmp['rate_bad'], mode='lines+markers',
+                       name=gc, line=dict(color=color),
+                       hovertemplate=gc + '<br><br>lbl=%{x}<br>rate_bad=%{y}<extra></extra>',
+                       legendgroup=gc, showlegend=False),
+            row=1, col=1
+        )
+        fig.add_trace(
+            go.Bar(x=tmp['lbl'], y=tmp['cnt'], name=gc, opacity=0.5, marker=dict(color=color),
+                   hovertemplate=gc + '<br><br>lbl=%{x}<br>cnt=%{y}<extra></extra>',
+                   yaxis='y2', legendgroup=gc, showlegend=False),
+            row=1, col=1
+        )
+        # x:y_pred
+        fig.add_trace(
+            go.Scatter(x=tmp['lbl'], y=tmp['score_avg'], mode='lines+markers',
+                       name=gc, line=dict(color=color),
+                       hovertemplate=gc + '<br><br>lbl=%{x}<br>score_avg=%{y}<extra></extra>',
+                       legendgroup=gc, showlegend=True),
+            row=2, col=1
+        )
+    fig.update_traces(row=1, col=1, secondary_y=True, overwrite=True,
+                      xaxis=dict(tickangle=-30),
+                      yaxis=dict(title=y_true, side='left'),
+                      yaxis2=dict(title='cnt', anchor='x', overlaying='y', zeroline=True, side='right'), )
+    # fig.update_traces(row=2,col=1,secondary_y=False,xaxis=dict(tickangle=-30),yaxis=dict(title=y_pred),)
+    fig.update_yaxes(
+        matches=None,
+    )
+    fig.update_layout(
+        title=dict(y=0.9, x=0.5, xanchor='center', yanchor='top'),
+        # 横向图例
+        legend=dict(orientation='h', yanchor="bottom", y=-0.4, xanchor="left", x=0),
+        width=900,
+        height=900 * 0.62
+    )
+    if is_show:
+        fig.show()
+    return fig, gp
+
+
+def plot_line(df, x: str, y_line: str, group_cols=[], title='', is_show=False) -> go.Figure:
+    """
+    折线图
+    返回 fig
+    """
+    if group_cols is None or len(group_cols) == 0:
+        df['group_cols_str'] = ''
+    else:
+        df['group_cols_str'] = df[group_cols].apply(
+            lambda xx: '::'.join(['{}={}'.format(k, v) for k, v in zip(group_cols, xx)]),
+            axis=1)
+    df[x] = df[x].astype(str)
+    fig = px.line(df, x=x, y=y_line, line_group='group_cols_str', markers=True, width=900, height=900 * 0.62)
+    fig.update_layout(
+        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
+        xaxis=dict(title=x, tickangle=-15),
+        yaxis=dict(title=y_line, zeroline=True),
+        legend=dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h'),
+    )
+    if is_show:
+        fig.show()
+    return fig
 
 
 def plot_line_with_bar(df, x: str, y_line: str, y_bar: str, group_cols=[], title='', is_show=False) -> go.Figure:
@@ -101,54 +205,6 @@ def plot_line_with_bar(df, x: str, y_line: str, y_bar: str, group_cols=[], title
     if is_show:
         fig.show()
     return fig
-
-
-def plot_univar_and_pdp(df, x, y_true, y_pred, n_bin=10, feature_grid=[], is_show=False):
-    """
-    适用于二分类：2个子图，一个是 x-y   一个是 x-y_pred图
-    :return: fig,gp_lift
-    """
-    # 对x 进行分组
-    df = mdlutil.get_bin(df, x, cut_type=1, n_bin=n_bin, feature_grid=feature_grid)
-    # 每组求y_true & y_pred 的均值
-    gp = df.groupby(['lbl_index', 'lbl', 'lbl_left']).agg(
-        cnt=(y_true, 'count'),
-        cnt_bad=(y_true, 'sum'),
-        rate_bad=(y_true, 'mean'),
-        score_avg=(y_pred, 'mean')
-    ).reset_index()
-    gp['rate_bad'] = np.round(gp['rate_bad'], 3)
-    gp['score_avg'] = np.round(gp['score_avg'], 6)
-    gp['lbl'] = gp['lbl'].astype(str)
-    # 画图 x-y_true
-    fig = make_subplots(rows=2, cols=1, subplot_titles=('univar-' + x, 'pdp-' + x))
-    fig.add_trace(
-        go.Scatter(x=gp['lbl'], y=gp['rate_bad'], mode='lines+markers', ),
-        row=1, col=1
-    )
-    # y_pred
-    fig.add_trace(
-        go.Scatter(x=gp['lbl'], y=gp['score_avg'], mode='lines+markers'),
-        row=2, col=1
-    )
-    fig.update_yaxes(
-        matches=None,
-    )
-    fig.update_layout(
-        title=dict(y=0.9, x=0.5, xanchor='center', yanchor='top'),
-        # 横向图例
-        legend=dict(orientation='h', yanchor="bottom", y=-0.4, xanchor="left", x=0),
-        width=900,
-        height=900 * 0.62,
-        xaxis=dict(tickangle=-30),
-        # 第二个子图的横坐标轴
-        xaxis2=dict(tickangle=-30),
-        yaxis=dict(title=y_true),
-        yaxis2=dict(title=y_pred)
-    )
-    if is_show:
-        fig.show()
-    return fig, gp
 
 
 # def plot_liftvar(df: pd.DataFrame, x1: str, y1: str, x2: str, y2: str,
