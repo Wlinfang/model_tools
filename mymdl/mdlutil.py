@@ -216,8 +216,8 @@ def histvar(df, x, feature_grid=[], cut_type=2, n_bin=10, group_cols=[]):
         # 如果是 cls_cols.extend，则会更新 group_cols
         cls_cols = cls_cols + ['lbl']
     gp = df.groupby(cls_cols).size().reset_index().rename(columns={0: 'cnt'})
-    gp['cnt']=gp['cnt'].astype(int)
-    gp['cnt_rate']=np.round(gp['cnt']/df.shape[0],3)
+    gp['cnt'] = gp['cnt'].astype(int)
+    gp['cnt_rate'] = np.round(gp['cnt'] / df.shape[0], 3)
     return gp
 
 
@@ -325,6 +325,71 @@ def binary_liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     gp.reset_index(inplace=True)
     cols = cls_cols + ['cnt', 'cnt_bad', 'rate_bad', 'accum_cnt', 'accum_cnt_bad', 'accum_rate_bad', 'lift_bad']
     return gp[cols]
+
+
+def twoscores_binary_liftvar(df, f1_score, f2_score, target, f1_grid=[],f2_grid=[],n_bin=10) -> pd.DataFrame:
+    """
+    评估2个模型分的联合的lift 变化
+    :param f1 f2 ::: feature_name
+    :param target:
+    :param show_flat 数据展示模型，True 展开；False 堆叠
+    :return:'cnt', 'rate_bad', 'accum_cnt_rate', 'accum_rate_bad', 'accum_lift_bad'
+    """
+    cols = [target, f1_score, f2_score]
+    df = df[cols]
+    df = get_bin(df, f1_score, feature_grid=f1_grid,cut_type=1, n_bin=n_bin)
+    df.rename(columns={'lbl': '%s_lbl' % f1_score, 'lbl_index': '%s_lbl_index' % f1_score}, inplace=True)
+    df = get_bin(df, f2_score,feature_grid=f2_grid, cut_type=1, n_bin=n_bin)
+    df.rename(columns={'lbl': '%s_lbl' % f2_score, 'lbl_index': '%s_lbl_index' % f2_score}, inplace=True)
+    ix = '%s_lbl' % f1_score
+    column = '%s_lbl' % f2_score
+    gp = pd.pivot_table(df, values=[target], index=ix,
+                        columns=column, fill_value=0,
+                        aggfunc=('count', 'sum', 'mean'), observed=True, )
+    gp = gp[target]
+    # 所有的数量
+    all_cnt = df.shape[0]
+    all_bad_cnt = df[target].sum()
+    all_bad_rate = np.round(all_bad_cnt / all_cnt, 3)
+    # 分组数量计算
+    t_cnt = gp['count']
+    t_cnt = t_cnt.stack().reset_index().rename(columns={0: 'cnt'})
+    # 每组坏比例
+    t_bad_rate = gp['mean']
+    t_bad_rate = t_bad_rate.stack().reset_index().rename(columns={0: 'rate_bad'})
+    gp_out = t_cnt.merge(t_bad_rate, on=[ix, column], how='outer')
+    # 累计总量
+    t_accum_cnt = gp['count'].cumsum(axis=1).cumsum(axis=0)
+    # 累计总量占比
+    t_accum_rate = np.round(t_accum_cnt / all_cnt, 3)
+    t_accum_rate = t_accum_rate.stack().reset_index().rename(columns={0: 'accum_cnt_rate'})
+    gp_out = gp_out.merge(t_accum_rate, on=[ix, column], how='outer')
+    # 累计所有坏的比例
+    t_accum_bad = gp['sum'].cumsum(axis=1).cumsum(axis=0)
+    t_accum_rate_bad = np.round(t_accum_bad / t_accum_cnt, 3)
+    # lift
+    t_accum_lift = np.round(t_accum_rate_bad/all_bad_rate,3)
+    # 累计坏比例
+    t_accum_rate_bad = t_accum_rate_bad.stack().reset_index().rename(columns={0: 'accum_rate_bad'})
+    gp_out = gp_out.merge(t_accum_rate_bad, on=[ix, column], how='outer')
+
+    t_accum_lift = t_accum_lift.stack().reset_index().rename(columns={0: 'accum_lift_bad'})
+    gp_out = gp_out.merge(t_accum_lift, on=[ix, column], how='outer')
+
+    # if not show_flat:
+    # 堆叠模式
+    # gp_out = gp_out.set_index([ix, column])
+    # gp_out = gp_out.stack().reset_index().rename(columns={'level_2': 'key', 0: 'value'})
+    # gp_out = pd.pivot_table(gp_out, values=['value'], index=ix,
+    #                         columns=[column, 'key'],
+    #                         aggfunc=np.mean, sort=False)
+    # gp_out = gp_out['value']
+    gp_out = pd.pivot_table(gp_out,
+                            values=['cnt', 'rate_bad', 'accum_cnt_rate', 'accum_rate_bad', 'accum_lift_bad'],
+                            index=ix,
+                            columns=column,
+                            aggfunc=np.mean, sort=False)
+    return gp_out
 
 
 def multiscores_binary_liftvar(df, model_scores: list, target, n_bin=10) -> pd.DataFrame:

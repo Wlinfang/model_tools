@@ -137,8 +137,8 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, group_cols=[], feature_grid=[], c
         yaxis=dict(title=y_true, zeroline=True,range=[0,gp['rate_bad'].max()+0.001]),
         yaxis2=dict(title='cnt', zeroline=True),
         yaxis3=dict(title=y_pred, zeroline=True),
-        width=900,
-        height=900 * 0.62
+        width=800,
+        height=900 * 0.8
     )
     if is_show:
         fig.show()
