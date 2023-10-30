@@ -47,7 +47,7 @@ class ModelReport:
         else:
             feature_grid = mdlutil.get_feature_grid(df_test[x], cut_type=1, n_bin=n_bin)
             t = df_test[cols]
-        fig, gp = plotutil.plot_score_liftvar(t, x, y, group_cols, feature_grid=feature_grid, is_show=is_show)
+        fig, gp = plotutil.plot_score_liftvar(t, x, y, group_cols+['sample_type'], feature_grid=feature_grid, is_show=is_show)
         if is_save:
             plotutil.save_fig_tohtml(self.__report_file, fig)
         return fig, gp
@@ -75,7 +75,8 @@ class ModelReport:
             feature_grid = mdlutil.get_feature_grid(df_test[feature_name], cut_type=1, n_bin=n_bin)
             t = df_test[cols]
         feature_desc = self.__feature_dict.get(feature_name, feature_name)
-        fig, gp = plotutil.plot_univar_and_pdp(t, x=feature_name, y_true=y_true, y_pred=y_pred, group_cols=group_cols,
+        fig, gp = plotutil.plot_univar_and_pdp(t, x=feature_name, y_true=y_true, y_pred=y_pred,
+                                               group_cols=group_cols+['sample_type'],
                                                feature_grid=feature_grid,
                                                title=feature_desc, is_show=is_show)
         if is_save:
