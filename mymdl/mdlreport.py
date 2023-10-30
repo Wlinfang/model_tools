@@ -31,9 +31,7 @@ class ModelReport:
         """
         if group_cols is None:
             group_cols = []
-        group_cols.append('sample_type')
-        cols = [x, y] + group_cols
-
+        cols = [x, y, 'sample_type'] + group_cols
         if df_test is None:
             raise ValueError('df_test is None！！！')
             return None
@@ -63,8 +61,7 @@ class ModelReport:
         """
         if group_cols is None:
             group_cols = []
-        group_cols.append('sample_type')
-        cols = [feature_name, y_true, y_pred] + group_cols
+        cols = [feature_name, y_true, y_pred, 'sample_type'] + group_cols
         if plot_trte and df_train is None:
             return None
         if df_test is None:
