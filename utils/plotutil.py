@@ -292,57 +292,6 @@ def plot_liftvar(df, y_true: str, y_pred: str, group_cols=[], feature_grid=[], c
     return fig, gp
 
 
-def plot_score_liftvar(df, y_true: str, y_pred: str, group_cols=[], n_bin=10, feature_grid=[], is_show=False):
-    """
-    分组lift
-    数据为明细数据
-    :return fig,gp_lift
-    """
-    gp = mdlutil.binary_liftvar(df, x=y_pred, y=y_true, group_cols=group_cols, n_bin=n_bin, feature_grid=feature_grid)
-    # 分组计算 auc,ks,gini
-    gp_auc = mdlutil.evaluate_binary_classier_bygroup(df, y_true, y_pred, group_cols=group_cols)
-
-    if group_cols is not None and len(group_cols) > 0:
-        gp_auc['group_cols_str'] = gp_auc[group_cols].apply(lambda x: ':'.join(x), axis=1)
-        gp['group_cols_str'] = gp[group_cols].apply(lambda x: ':'.join(x), axis=1)
-    else:
-        gp['group_cols_str'] = ''
-        gp_auc['group_cols_str'] = ''
-    gp_auc['auc_info'] = gp_auc.apply(
-        lambda x: 'cnt:{} auc:{} ks:{}'.format(x['cnt'], x['auc'], x['ks']), axis=1)
-    gp = gp.merge(gp_auc[['group_cols_str', 'auc_info']], on='group_cols_str', how='left')
-    gp['legend_name'] = gp.apply(
-        lambda x: '{}::{}'.format(x['group_cols_str'], x['auc_info']), axis=1)
-    # lift: rate_bad lift
-    t1 = gp[['legend_name', 'lbl', 'lbl_index', 'rate_bad', 'cnt']].rename(columns={'rate_bad': 'value'})
-    t1['key'] = 'rate_bad'
-    t2 = gp[['legend_name', 'lbl', 'lbl_index', 'lift_bad', 'cnt']].rename(columns={'lift_bad': 'value'})
-    t2['key'] = 'lift_bad'
-    t = pd.concat([t1, t2])
-    t['lbl'] = t['lbl'].astype(str)
-    fig = px.line(t, x='lbl', y='value', color='legend_name',
-                  line_group='legend_name', facet_col='key',
-                  hover_data=['legend_name', 'lbl', 'cnt', 'value'],
-                  orientation='h', facet_col_wrap=2, markers=True, facet_col_spacing=0.05,
-                  width=1000, height=1000 * 0.62, title=x_score)
-
-    fig.update_yaxes(
-        matches=None, showticklabels=True
-    )
-    fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
-    fig.update_layout(
-        # 横向图例
-        title=dict(text=x_score),
-        legend=dict(orientation='h', yanchor="bottom", y=-0.5, xanchor="left", x=0),
-        xaxis=dict(tickangle=-30),
-        xaxis2=dict(tickangle=-30),
-    )
-    if is_show:
-        fig.show()
-    gp.drop(['group_cols_str', 'auc_info', 'legend_name'], axis=1, inplace=True)
-    return fig, gp
-
-
 def plot_scores_liftvar(df, x_scores: list, target, n_bin=10, is_show=False):
     """
     多个模型分的lift图
