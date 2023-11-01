@@ -134,7 +134,7 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, group_cols=[], feature_grid=[], c
         legend=dict(orientation='h', yanchor="bottom", y=-0.4, xanchor="left", x=0),
         xaxis=dict(visible=False),
         xaxis2=dict(title=x, tickangle=-30),
-        yaxis=dict(title=y_true, zeroline=True,range=[0,gp['rate_bad'].max()+0.001]),
+        yaxis=dict(title=y_true, zeroline=True, range=[0, gp['rate_bad'].max() + 0.001]),
         yaxis2=dict(title='cnt', zeroline=True),
         yaxis3=dict(title=y_pred, zeroline=True),
         width=800,
@@ -217,29 +217,95 @@ def plot_line_with_bar(df, x: str, y_line: str, y_bar: str, group_cols=[], title
     return fig
 
 
-def plot_score_liftvar(df, x_score: str, target, group_cols=[], n_bin=10, feature_grid=[], is_show=False):
+def plot_liftvar(df, y_true: str, y_pred: str, group_cols=[], feature_grid=[], cut_type=1, n_bin=10, title='',
+                 is_show=False):
+    """
+    对x进行分组计算，计算lift var
+    :return fig,gp_lift
+    """
+    gp = mdlutil.binary_liftvar(df, x=y_pred, y=y_true, group_cols=group_cols, feature_grid=feature_grid,
+                                cut_type=cut_type, n_bin=n_bin)
+    # 分组计算 auc,ks,gini
+    gp_auc = mdlutil.evaluate_binary_classier_bygroup(df, y_true, y_pred, group_cols=group_cols)
+    # gp merge gp_auc
+    if group_cols is not None and len(group_cols) > 0:
+        gp_auc['group_cols_str'] = gp_auc[group_cols].apply(lambda x: ':'.join(x), axis=1)
+        gp['group_cols_str'] = gp[group_cols].apply(lambda x: ':'.join(x), axis=1)
+    else:
+        gp['group_cols_str'] = ''
+        gp_auc['group_cols_str'] = ''
+    gp_auc['auc_info'] = gp_auc.apply(
+        lambda x: 'cnt:{} auc:{} ks:{}'.format(x['cnt'], x['auc'], x['ks']), axis=1)
+    gp = gp.merge(gp_auc[['group_cols_str', 'auc_info']], on='group_cols_str', how='left')
+    gp['legend_name'] = gp.apply(
+        lambda x: '{}::{}'.format(x['group_cols_str'], x['auc_info']), axis=1)
+    gp.drop(['group_cols_str', 'auc_info'], axis=1, inplace=True)
+
+    # 一行两列，legend group_cols + gp_auc
+    fig = make_subplots(rows=1, cols=2, subplot_titles=('univar', 'liftvar'),
+                        specs=[[{"secondary_y": False}, {"secondary_y": False}]],
+                        # shared_xaxes="all",
+                        # shared_yaxes="all",
+                        vertical_spacing=0.06,
+                        horizontal_spacing=0.04
+                        )
+    gcs = gp['legend_name'].unique()
+    gp['lbl'] = gp['lbl'].astype(str)
+    colors = px.colors.qualitative.Dark24
+    for ix in range(0, len(gcs), 1):
+        gc = gcs[ix]
+        color = colors[ix]
+        tmp = gp[gp['legend_name'] == gc]
+        fig.add_trace(
+            go.Scatter(x=tmp['lbl'], y=tmp['rate_bad'], mode='lines+markers',
+                       name=gc, line=dict(color=color),
+                       hovertext=['legend_name', 'lbl', 'cnt', 'rate_bad'],
+                       hovertemplate=gc + '<br><br>lbl=%{x}<br>rate_bad=%{y}<extra></extra>',
+                       legendgroup=gc, showlegend=False),
+            row=1, col=1, secondary_y=False
+        )
+        fig.add_trace(
+            go.Scatter(x=tmp['lbl'], y=tmp['lift_bad'], mode='lines+markers',
+                       name=gc, line=dict(color=color),
+                       hovertext=['legend_name', 'lbl', 'accum_cnt', 'lift_bad'],
+                       hovertemplate=gc + '<br><br>lbl=%{x}<br>lift_bad=%{y}<extra></extra>',
+                       legendgroup=gc, showlegend=True),
+            row=1, col=2, secondary_y=False
+        )
+    # update
+    fig.update_yaxes(
+        matches=None,
+    )
+    fig.update_layout(
+        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
+        # 横向图例
+        legend=dict(orientation='h', yanchor="bottom", y=-0.4, xanchor="left", x=0),
+        xaxis=dict(title=y_pred, tickangle=-30),
+        xaxis2=dict(title=y_pred, tickangle=-30),
+        yaxis=dict(title=y_true, zeroline=True, range=[0, gp['rate_bad'].max() + 0.001]),
+        yaxis2=dict(title='', zeroline=True),
+        width=1000,
+        height=600
+    )
+    if is_show:
+        fig.show()
+    return fig, gp
+
+
+def plot_score_liftvar(df, y_true: str, y_pred: str, group_cols=[], n_bin=10, feature_grid=[], is_show=False):
     """
     分组lift
     数据为明细数据
     :return fig,gp_lift
     """
-    gp = mdlutil.binary_liftvar(df, x=x_score, y=target, group_cols=group_cols, n_bin=n_bin, feature_grid=feature_grid)
+    gp = mdlutil.binary_liftvar(df, x=y_pred, y=y_true, group_cols=group_cols, n_bin=n_bin, feature_grid=feature_grid)
     # 分组计算 auc,ks,gini
+    gp_auc = mdlutil.evaluate_binary_classier_bygroup(df, y_true, y_pred, group_cols=group_cols)
+
     if group_cols is not None and len(group_cols) > 0:
-        gp_auc = df[df[x_score].notna()].groupby(group_cols).apply(
-            lambda x: mdlutil.evaluate_binary_classier(x[target], x[x_score], is_show=False))
-        gp_auc = gp_auc.reset_index().rename(columns={0: 'value'})
-        gp_auc.loc[:, ['cnt', 'auc', 'ks', 'gini']] = gp_auc['value'].apply(pd.Series,
-                                                                            index=['cnt', 'auc', 'ks', 'gini'])
-        gp_auc.drop(['value'], axis=1, inplace=True)
         gp_auc['group_cols_str'] = gp_auc[group_cols].apply(lambda x: ':'.join(x), axis=1)
         gp['group_cols_str'] = gp[group_cols].apply(lambda x: ':'.join(x), axis=1)
-
     else:
-        cnt, auc, ks, gini = mdlutil.evaluate_binary_classier(df[df[x_score].notna()][target],
-                                                              df[df[x_score].notna()][x_score])
-        gp_auc = pd.DataFrame([[cnt, auc, ks, gini]], columns=['cnt', 'auc', 'ks', 'gini'], index=['all'])
-        print(gp_auc)
         gp['group_cols_str'] = ''
         gp_auc['group_cols_str'] = ''
     gp_auc['auc_info'] = gp_auc.apply(
@@ -248,14 +314,15 @@ def plot_score_liftvar(df, x_score: str, target, group_cols=[], n_bin=10, featur
     gp['legend_name'] = gp.apply(
         lambda x: '{}::{}'.format(x['group_cols_str'], x['auc_info']), axis=1)
     # lift: rate_bad lift
-    t1 = gp[['legend_name', 'lbl', 'lbl_index', 'rate_bad']].rename(columns={'rate_bad': 'value'})
+    t1 = gp[['legend_name', 'lbl', 'lbl_index', 'rate_bad', 'cnt']].rename(columns={'rate_bad': 'value'})
     t1['key'] = 'rate_bad'
-    t2 = gp[['legend_name', 'lbl', 'lbl_index', 'lift_bad']].rename(columns={'lift_bad': 'value'})
+    t2 = gp[['legend_name', 'lbl', 'lbl_index', 'lift_bad', 'cnt']].rename(columns={'lift_bad': 'value'})
     t2['key'] = 'lift_bad'
     t = pd.concat([t1, t2])
     t['lbl'] = t['lbl'].astype(str)
     fig = px.line(t, x='lbl', y='value', color='legend_name',
                   line_group='legend_name', facet_col='key',
+                  hover_data=['legend_name', 'lbl', 'cnt', 'value'],
                   orientation='h', facet_col_wrap=2, markers=True, facet_col_spacing=0.05,
                   width=1000, height=1000 * 0.62, title=x_score)
 
@@ -312,8 +379,6 @@ def plot_scores_liftvar(df, x_scores: list, target, n_bin=10, is_show=False):
     if is_show:
         fig.show()
     return fig, gp
-
-
 
 
 def plot_corr_heatmap(df, feature_cols: list) -> pd.DataFrame:

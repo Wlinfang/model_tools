@@ -422,37 +422,6 @@ def multiscores_binary_liftvar(df, model_scores: list, target, n_bin=10) -> pd.D
     gp['accum_rate_bad'] = np.round(gp['accum_cnt_bad'] / gp['accum_cnt'], 2)
     gp['lift_bad'] = np.round(gp['rate_bad'] / all_bad_rate, 3)
     gp = gp.reset_index()
-
-    # # 分组数量计算
-    # t_cnt = gp['count']
-    # t_cnt = t_cnt.stack().reset_index().rename(columns={0: 'cnt'})
-    # # 每组坏比例
-    # t_bad_rate = gp['mean']
-    # t_bad_rate = t_bad_rate.stack().reset_index().rename(columns={0: 'rate_bad'})
-    # gp_out = t_cnt.merge(t_bad_rate, on=[ix, column], how='outer')
-    # # 累计总量
-    # t_accum_cnt = gp['count'].cumsum(axis=1).cumsum(axis=0)
-    # # 累计总量占比
-    # t_accum_rate = np.round(t_accum_cnt / all_cnt, 2)
-    # t_accum_rate = t_accum_rate.stack().reset_index().rename(columns={0: 'accum_cnt_rate'})
-    # gp_out = gp_out.merge(t_accum_rate, on=[ix, column], how='outer')
-    # # 累计所有坏的比例
-    # t_accum_bad = gp['sum'].cumsum(axis=1).cumsum(axis=0)
-    # t_accum_rate_bad = np.round(t_accum_bad / t_accum_cnt, 2)
-    # t_accum_rate_bad = t_accum_rate_bad.stack().reset_index().rename(columns={0: 'accum_rate_bad'})
-    # gp_out = gp_out.merge(t_accum_rate_bad, on=[ix, column], how='outer')
-    # # 累计坏占所有坏的占比
-    # t_accum_bad = t_accum_bad / all_bad_cnt
-    # # lift
-    # t_accum_bad = t_accum_bad / all_bad_rate
-    # t_accum_bad = t_accum_bad.stack().reset_index().rename(columns={0: 'accum_lift_bad'})
-    # gp_out = gp_out.merge(t_accum_bad, on=[ix, column], how='outer')
-    # if not show_flat:
-    #     gp_out = pd.pivot_table(gp_out,
-    #                             values=['cnt', 'rate_bad', 'accum_cnt_rate', 'accum_rate_bad', 'accum_lift_bad'],
-    #                             index=ix,
-    #                             columns=column,
-    #                             aggfunc=np.mean, sort=False)
     return gp
 
 
@@ -524,6 +493,20 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
         fig.show()
     return len(y_true), auc, ks, gini
 
+def evaluate_binary_classier_bygroup(df,y_true:str,y_pred:str,group_cols=[])->pd.DataFrame:
+    # 分组计算 auc,ks,gini
+    if group_cols is not None and len(group_cols) > 0:
+        gp_auc = df[df[y_pred].notna()].groupby(group_cols).apply(
+            lambda x: evaluate_binary_classier(x[y_true], x[y_pred], is_show=False))
+        gp_auc = gp_auc.reset_index().rename(columns={0: 'value'})
+        gp_auc.loc[:, ['cnt', 'auc', 'ks', 'gini']] = gp_auc['value'].apply(pd.Series,
+                                                                            index=['cnt', 'auc', 'ks', 'gini'])
+        gp_auc.drop(['value'], axis=1, inplace=True)
+    else:
+        cnt, auc, ks, gini = evaluate_binary_classier(df[df[y_pred].notna()][y_true],
+                                                              df[df[y_pred].notna()][y_pred])
+        gp_auc = pd.DataFrame([[cnt, auc, ks, gini]], columns=['cnt', 'auc', 'ks', 'gini'], index=['all'])
+    return gp_auc
 
 def evaluate_multi_classier(y_true, y_pred):
     """
