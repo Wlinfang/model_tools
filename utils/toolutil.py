@@ -81,7 +81,7 @@ def parse_month(df, date_name: str, date_name_new: str):
     if date_name not in columns:
         raise ('not found %' % date_name)
     df[date_name] = pd.to_datetime(df[date_name])
-    df[date_name_new] = df[date_name].dt.strftime('%y-%m')
+    df[date_name_new] = df[date_name].dt.strftime('%Y-%m')
     return df
 
 

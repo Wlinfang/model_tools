@@ -100,7 +100,7 @@ class MySqlEngine:
         echo: 是否打印sql
         """
         self.__engine = create_engine(
-            'mysql+mysqldb://{user_name}:{passwd}@{ip}:{port}/{db_name}?charset=utf8'.format(
+            'mysql+pymysql://{user_name}:{passwd}@{ip}:{port}/{db_name}?charset=utf8'.format(
                 ip=ip, port=port, user_name=user_name, passwd=passwd, db_name=db_name),
             echo=echo)
 
