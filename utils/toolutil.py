@@ -8,6 +8,10 @@ import base64
 import numpy as np
 import pandas as pd
 from typing import Union
+
+import json
+from itertools import chain
+
 import logging
 
 # 科学计数法全部显示
@@ -180,4 +184,17 @@ def parse_cols_to_json(df: pd.DataFrame, feature_cols: list, json_column_name: s
     data = {json_column_name: t}
     t = pd.DataFrame(data, index=df.index)
     df = df[cols].merge(t, left_index=True, right_index=True, how='inner')
+    return df
+
+
+def parse_json_to_cols(df:pd.DataFrame,json_col:str)-> pd.DataFrame:
+    """
+    将 df 中的 json 列数据，展开，json 格式为单层的
+    """
+    df['tmp_json_column'] = df[json_col].map(lambda x: list(json.loads(x).keys()))
+    # 展开的 key
+    add_columns = list(set(list(chain(*df['tmp_json_column']))))
+    for c in add_columns:
+        df[c] = df[json_col].map(lambda x: json.loads(x).get(str(c)))
+    df.drop('tmp_json_column',axis=1,inplace=True)
     return df
