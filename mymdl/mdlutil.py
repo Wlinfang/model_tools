@@ -215,9 +215,14 @@ def histvar(df, x, feature_grid=[], cut_type=2, n_bin=10, group_cols=[]):
     else:
         # 如果是 cls_cols.extend，则会更新 group_cols
         cls_cols = cls_cols + ['lbl']
+        gp_all = df.groupby(group_cols).size().reset_index().rename(columns={0: 'cnt_all'})
     gp = df.groupby(cls_cols).size().reset_index().rename(columns={0: 'cnt'})
     gp['cnt'] = gp['cnt'].astype(int)
-    gp['cnt_rate'] = np.round(gp['cnt'] / df.shape[0], 3)
+    if len(group_cols) == 0:
+        gp['cnt_all'] = df.shape[0]
+    else:
+        gp = gp.merge(gp_all, on=group_cols, how='inner')
+    gp['cnt_rate'] = np.round(gp['cnt'] / gp['cnt_all'], 3)
     return gp
 
 
@@ -236,10 +241,10 @@ def univar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     df = get_bin(df, x, feature_grid=feature_grid, cut_type=cut_type, n_bin=n_bin)
     cls_cols = group_cols
     if len(group_cols) == 0:
-        cls_cols = ['lbl_index', 'lbl', 'lbl_left']
+        cls_cols = ['lbl_index', 'lbl']
     else:
         # 如果是 cls_cols.extend，则会更新 group_cols
-        cls_cols = cls_cols + ['lbl_index', 'lbl', 'lbl_left']
+        cls_cols = cls_cols + ['lbl_index', 'lbl']
     gp = pd.pivot_table(df, values=y, index=cls_cols,
                         sort='lbl_index', aggfunc=['count', 'sum', 'mean'],
                         fill_value=0, margins=False, observed=True)
@@ -327,7 +332,7 @@ def binary_liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     return gp[cols]
 
 
-def twoscores_binary_liftvar(df, f1_score, f2_score, target, f1_grid=[],f2_grid=[],n_bin=10) -> pd.DataFrame:
+def twoscores_binary_liftvar(df, f1_score, f2_score, target, f1_grid=[], f2_grid=[], n_bin=10) -> pd.DataFrame:
     """
     评估2个模型分的联合的lift 变化
     :param f1 f2 ::: feature_name
@@ -337,9 +342,9 @@ def twoscores_binary_liftvar(df, f1_score, f2_score, target, f1_grid=[],f2_grid=
     """
     cols = [target, f1_score, f2_score]
     df = df[cols]
-    df = get_bin(df, f1_score, feature_grid=f1_grid,cut_type=1, n_bin=n_bin)
+    df = get_bin(df, f1_score, feature_grid=f1_grid, cut_type=1, n_bin=n_bin)
     df.rename(columns={'lbl': '%s_lbl' % f1_score, 'lbl_index': '%s_lbl_index' % f1_score}, inplace=True)
-    df = get_bin(df, f2_score,feature_grid=f2_grid, cut_type=1, n_bin=n_bin)
+    df = get_bin(df, f2_score, feature_grid=f2_grid, cut_type=1, n_bin=n_bin)
     df.rename(columns={'lbl': '%s_lbl' % f2_score, 'lbl_index': '%s_lbl_index' % f2_score}, inplace=True)
     ix = '%s_lbl' % f1_score
     column = '%s_lbl' % f2_score
@@ -368,7 +373,7 @@ def twoscores_binary_liftvar(df, f1_score, f2_score, target, f1_grid=[],f2_grid=
     t_accum_bad = gp['sum'].cumsum(axis=1).cumsum(axis=0)
     t_accum_rate_bad = np.round(t_accum_bad / t_accum_cnt, 3)
     # lift
-    t_accum_lift = np.round(t_accum_rate_bad/all_bad_rate,3)
+    t_accum_lift = np.round(t_accum_rate_bad / all_bad_rate, 3)
     # 累计坏比例
     t_accum_rate_bad = t_accum_rate_bad.stack().reset_index().rename(columns={0: 'accum_rate_bad'})
     gp_out = gp_out.merge(t_accum_rate_bad, on=[ix, column], how='outer')
@@ -493,7 +498,8 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
         fig.show()
     return len(y_true), auc, ks, gini
 
-def evaluate_binary_classier_bygroup(df,y_true:str,y_pred:str,group_cols=[])->pd.DataFrame:
+
+def evaluate_binary_classier_bygroup(df, y_true: str, y_pred: str, group_cols=[]) -> pd.DataFrame:
     # 分组计算 auc,ks,gini
     if group_cols is not None and len(group_cols) > 0:
         gp_auc = df[df[y_pred].notna()].groupby(group_cols).apply(
@@ -504,9 +510,10 @@ def evaluate_binary_classier_bygroup(df,y_true:str,y_pred:str,group_cols=[])->pd
         gp_auc.drop(['value'], axis=1, inplace=True)
     else:
         cnt, auc, ks, gini = evaluate_binary_classier(df[df[y_pred].notna()][y_true],
-                                                              df[df[y_pred].notna()][y_pred])
+                                                      df[df[y_pred].notna()][y_pred])
         gp_auc = pd.DataFrame([[cnt, auc, ks, gini]], columns=['cnt', 'auc', 'ks', 'gini'], index=['all'])
     return gp_auc
+
 
 def evaluate_multi_classier(y_true, y_pred):
     """
