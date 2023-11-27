@@ -32,7 +32,7 @@ def load_model_from_pkl(path):
 
 def load_by_joblib(path):
     with open(path, 'rb') as f:
-        model = joblib.load(path)
+        model = joblib.load(f)
     return model
 
 def save_model_as_pmml(alg, save_file_path):
@@ -51,7 +51,7 @@ def save_model_as_pmml(alg, save_file_path):
     # # 模型训练
     # pipeline.fit(x, y)
     # 模型结果保存
-    sklearn2pmml(alg, pmml=save_file_path, with_repr=True)
+    sklearn2pmml(alg, save_file_path, with_repr=True)
 
 
 def load_model_from_pmml(load_file_path):
