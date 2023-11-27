@@ -2,8 +2,9 @@ import numpy as np
 
 
 class UserLevel:
-    def build_ul():
-        return UserLevel()
+    @classmethod
+    def build_ul(cls):
+        return cls()
 
     def get_user_level(self, *args):
         if len(args) == 3:
@@ -22,7 +23,7 @@ class UserLevel:
                 '2': {'A': 'AA-1', 'B': 'AA-1', 'C': 'AA-1', 'D': 'A-1', 'E': 'A-1', 'F': 'A-1'},
             }
         }
-        return _user_l.get(str(os_type),{}).get(str(user_type),{}).get(str(flag_type),'KA')
+        return _user_l.get(str(os_type), {}).get(str(user_type), {}).get(str(flag_type), 'KA')
 
 
 class UserLevelAlg:
@@ -41,3 +42,17 @@ from model_tools.utils import fileutil
 
 # 保存模型
 fileutil.save_model_as_pkl(ula, 'user_level_v1_str.pkl')
+
+# 加载模型
+
+ula = fileutil.load_by_joblib('user_level_v1_str.pkl')
+input_cols=[
+    'os_type',
+    'flag_type',
+    'user_type',
+    'age',
+]
+values=['0','A','0',23]
+import pandas as pd
+X = pd.DataFrame([values], columns=input_cols)
+ula.predict_proba(X)
