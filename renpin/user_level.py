@@ -43,8 +43,7 @@ from model_tools.utils import fileutil
 # 保存模型
 fileutil.save_model_as_pkl(ula, 'user_level_v1_str.pkl')
 
-# 加载模型
-
+#=====test 加载模型 ====================================
 ula = fileutil.load_by_joblib('user_level_v1_str.pkl')
 input_cols=[
     'os_type',
