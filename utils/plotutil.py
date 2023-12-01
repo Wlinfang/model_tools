@@ -303,7 +303,7 @@ def plot_scores_liftvar(df, x_scores: list, target, n_bin=10, is_show=False):
     for x in x_scores:
         gp = mdlutil.binary_liftvar(df, x, target, n_bin=n_bin)
         t = df[df[x].notna()]
-        cnt, auc, ks, gini = mdlutil.evaluate_binary_classier(t[target], t[x])
+        cnt,rate_bad, auc, ks, gini = mdlutil.evaluate_binary_classier(t[target], t[x])
         gp['model_name'] = '{}::{}::auc={}::ks={}'.format(x, int(cnt), auc, ks)
         data.append(gp)
     gp = pd.concat(data)

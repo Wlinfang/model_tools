@@ -449,14 +449,14 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
     | 真正率(TPR) = TP / (TP+FN)-- 以真实样本 分母为真实正样本
     | 假正率(FPR) = FP / (FP+TN)-- 以真实样本 分母为真实负样本
     | Roc 曲线：y-axis=真正率 ; x-axis=假正率； 无视样本不均衡问题
-    :return cnt,auc,ks,gini
+    :return cnt,mean,auc,ks,gini
     """
     if y_true is None or y_pred is None or len(y_true) == 0 or len(y_pred) == 0:
-        return None, None, None, None
+        return None,None, None, None, None
     if len(np.unique(y_true)) == 1:
         # only one class
         logging.info('only one class !!!')
-        return None, None, None, None
+        return None,None, None, None, None
     # 返回 精确率，召回率，F1
     fpr, tpr, thr = metrics.roc_curve(y_true, y_pred)
     auc = np.round(metrics.roc_auc_score(y_true, y_pred), 3)
@@ -496,7 +496,7 @@ def evaluate_binary_classier(y_true: Union[list, pd.Series, np.array],
         # uniformtext_minsize 调整标注文字大小；uniformtext_mode 不合规数字隐藏
         fig.update_layout(title=title, uniformtext_minsize=2, uniformtext_mode='hide')
         fig.show()
-    return len(y_true), auc, ks, gini
+    return len(y_true),np.round(np.mean(y_true),3), auc, ks, gini
 
 
 def evaluate_binary_classier_bygroup(df, y_true: str, y_pred: str, group_cols=[]) -> pd.DataFrame:
@@ -505,13 +505,13 @@ def evaluate_binary_classier_bygroup(df, y_true: str, y_pred: str, group_cols=[]
         gp_auc = df[df[y_pred].notna()].groupby(group_cols).apply(
             lambda x: evaluate_binary_classier(x[y_true], x[y_pred], is_show=False))
         gp_auc = gp_auc.reset_index().rename(columns={0: 'value'})
-        gp_auc.loc[:, ['cnt', 'auc', 'ks', 'gini']] = gp_auc['value'].apply(pd.Series,
-                                                                            index=['cnt', 'auc', 'ks', 'gini'])
+        gp_auc.loc[:, ['cnt','rate_bad', 'auc', 'ks', 'gini']] = gp_auc['value'].apply(pd.Series,
+                                                                            index=['cnt','rate_bad', 'auc', 'ks', 'gini'])
         gp_auc.drop(['value'], axis=1, inplace=True)
     else:
-        cnt, auc, ks, gini = evaluate_binary_classier(df[df[y_pred].notna()][y_true],
+        cnt,rate_bad, auc, ks, gini = evaluate_binary_classier(df[df[y_pred].notna()][y_true],
                                                       df[df[y_pred].notna()][y_pred])
-        gp_auc = pd.DataFrame([[cnt, auc, ks, gini]], columns=['cnt', 'auc', 'ks', 'gini'], index=['all'])
+        gp_auc = pd.DataFrame([[cnt, auc, ks, gini]], columns=['cnt','rate_bad',  'auc', 'ks', 'gini'], index=['all'])
     return gp_auc
 
 
