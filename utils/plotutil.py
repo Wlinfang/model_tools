@@ -209,6 +209,7 @@ def plot_line_with_bar(df, x: str, y_line: str, y_bar: str, group_cols=[], title
         legend=dict(yanchor="bottom", y=-0.4, xanchor="right", x=1, orientation='h'),
         # bargap=0.8,  # 组间距离
         bargroupgap=0.05,  # 组内距离
+        hovermode="x unified",
         width=900,
         height=900 * 0.618
     )

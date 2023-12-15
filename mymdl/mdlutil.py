@@ -550,6 +550,14 @@ def evaluate_ranking():
     """
     pass
 
+def evaluate_roi():
+    """
+    模型AUC 指标，如何表现为样本的影响上
+    ROI:投资回报率 = 收益/成本
+    """
+    pass
+
+
 
 class Confidence:
     """
