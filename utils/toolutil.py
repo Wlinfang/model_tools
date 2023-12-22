@@ -4,7 +4,7 @@ import datetime
 import time
 import hashlib
 import base64
-
+import ast
 import numpy as np
 import pandas as pd
 from typing import Union
@@ -187,14 +187,16 @@ def parse_cols_to_json(df: pd.DataFrame, feature_cols: list, json_column_name: s
     return df
 
 
-def parse_json_to_cols(df:pd.DataFrame,json_col:str)-> pd.DataFrame:
+def parse_json_to_cols(df: pd.DataFrame, json_col: str) -> pd.DataFrame:
     """
     将 df 中的 json 列数据，展开，json 格式为单层的
     """
-    df['tmp_json_column'] = df[json_col].map(lambda x: list(json.loads(x).keys()))
+    df['tmp_json'] = df[json_col].map(lambda x: ast.literal_eval(x))
+    df['tmp_json_column'] = df['tmp_json'].map(lambda x: list(x.keys()))
+    # df['tmp_json_column'] = df[json_col].map(lambda x: list(json.loads(x).keys()))
     # 展开的 key
     add_columns = list(set(list(chain(*df['tmp_json_column']))))
     for c in add_columns:
-        df[c] = df[json_col].map(lambda x: json.loads(x).get(str(c)))
-    df.drop('tmp_json_column',axis=1,inplace=True)
+        df[c] = df['tmp_json'].map(lambda x: x.get(str(c)))
+    df.drop(['tmp_json_column', 'tmp_json'], axis=1, inplace=True)
     return df

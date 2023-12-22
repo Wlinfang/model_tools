@@ -511,7 +511,7 @@ def evaluate_binary_classier_bygroup(df, y_true: str, y_pred: str, group_cols=[]
     else:
         cnt,rate_bad, auc, ks, gini = evaluate_binary_classier(df[df[y_pred].notna()][y_true],
                                                       df[df[y_pred].notna()][y_pred])
-        gp_auc = pd.DataFrame([[cnt, auc, ks, gini]], columns=['cnt','rate_bad',  'auc', 'ks', 'gini'], index=['all'])
+        gp_auc = pd.DataFrame([[cnt,rate_bad, auc, ks, gini]], columns=['cnt','rate_bad',  'auc', 'ks', 'gini'], index=['all'])
     return gp_auc
 
 
