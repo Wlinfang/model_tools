@@ -304,7 +304,7 @@ def plot_scores_liftvar(df, x_scores: list, target, n_bin=10, is_show=False):
     for x in x_scores:
         gp = mdlutil.binary_liftvar(df, x, target, n_bin=n_bin)
         t = df[df[x].notna()]
-        cnt,rate_bad, auc, ks, gini = mdlutil.evaluate_binary_classier(t[target], t[x])
+        cnt, rate_bad, auc, ks, gini = mdlutil.evaluate_binary_classier(t[target], t[x])
         gp['model_name'] = '{}::{}::auc={}::ks={}'.format(x, int(cnt), auc, ks)
         data.append(gp)
     gp = pd.concat(data)
@@ -315,7 +315,7 @@ def plot_scores_liftvar(df, x_scores: list, target, n_bin=10, is_show=False):
     t2['key'] = 'lift_bad'
     t = pd.concat([t1, t2])
     fig = px.line(t, x='lbl_index', y='value', color='model_name', line_group='model_name', facet_col='key',
-                  orientation='h', facet_col_wrap=1,
+                  orientation='h', facet_col_wrap=1, markers=True,
                   width=900, height=900 * 0.62)
     fig.update_yaxes(
         matches=None,

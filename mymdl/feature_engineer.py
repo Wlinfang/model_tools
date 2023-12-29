@@ -68,8 +68,8 @@ class FeatureEngineer:
             return df
         # 7天机构/ 15天机构
         df[feature_name] = np.round(df[feature_fenzi] / df[feature_fenmu], 3)
-        # 如果分母为0的情况，则为1
-        df.loc[df[feature_fenmu] == 0, feature_name] = 1
+        # 如果分母为0的情况，则为None
+        df.loc[df[feature_fenmu] == 0, feature_name] = None
         self.update_feature_dict(feature_name, feature_desc)
         return df
 
@@ -89,7 +89,7 @@ class FeatureEngineer:
         df[feature_name] = np.round(
             (df[feature_fenzi] - df[feature_fenmu]) / df[feature_fenmu], 3)
         # 如果分母为0的情况
-        df.loc[df[feature_fenmu] == 0, feature_name] = 1
+        df.loc[df[feature_fenmu] == 0, feature_name] = None
         self.update_feature_dict(feature_name, feature_desc)
         return df
 
