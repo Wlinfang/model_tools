@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
 from typing import Tuple, List, Union
-from model_tools.mymdl import mdlutil
 from sklearn.feature_selection import f_classif, SelectKBest
 from scipy import stats
+from ..mymdl import statsutil
 
 
 def filter_avona_classier(df, feature_cols: list, target: str) -> list:
@@ -41,7 +41,7 @@ def filter_miss_freq(df, feature_cols: List, miss_threold=0.9, freq_threold=0.8)
     过滤众数占比高超过 freq_threold 的特征
     :return 返回可用的特征
     """
-    gp = mdlutil.describe_df(df, feature_cols)
+    gp = statsutil.describe_df(df, feature_cols)
     gp['miss_rate_float'] = gp['miss_rate'].str.replace('%', '')
     gp['miss_rate_float'] = gp['miss_rate_float'].astype(float)
     gp['miss_rate_float'] = np.round(gp['miss_rate_float'] / 100, 2)
@@ -52,6 +52,24 @@ def filter_miss_freq(df, feature_cols: List, miss_threold=0.9, freq_threold=0.8)
     return list(set(feature_cols) - set(miss_feature_cols) - set(drop_cols))
 
 
+def filter_iv(df, feature_cols: list, target: str, iv_threold=0.02) -> pd.DataFrame:
+    """
+    1、过滤掉 < iv_threold 的特征
+    返回可用的特征的iv 信息
+    """
+    # 计算iv 值
+    iv_dict = {}
+    for f in feature_cols:
+        iv_value = statsutil.iv(df, f, target, cut_type=1, n_bin=10)
+        if iv_value < iv_threold:
+            continue
+        iv_dict[f] = iv_value
+    df_iv = pd.DataFrame.from_dict(iv_dict, orient='index', columns=['iv'])
+    df_iv = df_iv.reset_index()
+    df_iv.sort_values('iv', ascending=False, inplace=True)
+    return df_iv
+
+
 def filter_corr_iv(df, feature_cols: list, target: str, corr_threold=0.8, iv_threold=0.02) -> pd.DataFrame:
     """
     1、过滤掉 < iv_threold 的特征
@@ -59,15 +77,7 @@ def filter_corr_iv(df, feature_cols: list, target: str, corr_threold=0.8, iv_thr
     3、返回可用的特征的iv 信息
     """
     # 计算iv 值
-    iv_dict = {}
-    for f in feature_cols:
-        iv_value = mdlutil.iv(df, f, target, cut_type=1, n_bin=10)
-        if iv_value < iv_threold:
-            continue
-        iv_dict[f] = iv_value
-    df_iv = pd.DataFrame.from_dict(iv_dict, orient='index', columns=['iv'])
-    df_iv = df_iv.reset_index()
-    df_iv.sort_values('iv', ascending=False, inplace=True)
+    df_iv = filter_iv(df, feature_cols, target, iv_threold)
     # 高iv的特征
     feature_cols = df_iv['index'].unique()
     # 计算 corr
@@ -94,7 +104,7 @@ def filter_corr_iv(df, feature_cols: list, target: str, corr_threold=0.8, iv_thr
     return df_iv[df_iv['index'].isin(return_cols)]
 
 
-def filter_corr_target(df, feature_cols:list, target:str, threld=0.1, corr_method='pearsonr') -> list:
+def filter_corr_target(df, feature_cols: list, target: str, threld=0.1, corr_method='pearsonr') -> list:
     """
     过滤掉 feature 同 targe 不相关的特征 拒绝掉  （-threld，threld） 的特征
     计算指标 pearsonr & spearmanr=(变量排序 + pearsonr) & kendalltau(有序性)
@@ -154,9 +164,9 @@ def psi(data_base: Union[list, np.array, pd.Series],
     else:
         # 对 data_base 进行分组
         if feature_grid:
-            feature_grid = mdlutil.get_feature_grid(data_base, cut_type=1, n_bin=n_bin)
-        data_base = mdlutil.get_bin(data_base, 'data', feature_grid=feature_grid)
-        data_test = mdlutil.get_bin(data_test, 'data', feature_grid=feature_grid)
+            feature_grid = statsutil.get_featuregrid_by_equal_freq(data_base, n_bin=n_bin)
+        data_base = statsutil.get_bin(data_base, 'data', feature_grid=feature_grid)
+        data_test = statsutil.get_bin(data_test, 'data', feature_grid=feature_grid)
     # 统计每个区间的分布
     gp_base = data_base.groupby('lbl')['data'].count().reset_index()
     gp_test = data_test.groupby('lbl')['data'].count().reset_index()
@@ -170,7 +180,7 @@ def psi(data_base: Union[list, np.array, pd.Series],
     return np.round(gp['psi'].sum(), 2)
 
 
-def filter_features_psi(df_base, df_test, feature_names:list, threold=0.3) -> List:
+def filter_features_psi(df_base, df_test, feature_names: list, threold=0.3) -> List:
     """
     拒绝不稳定的特征 >threold 的特征，返回可用的特征
     """
@@ -182,23 +192,18 @@ def filter_features_psi(df_base, df_test, feature_names:list, threold=0.3) -> Li
     return left_feature_names
 
 
-def filter_psi_iv(df_base, df_test, feature_names:list, target:str, psi_threld=0.3, iv_threld=0.02) -> pd.DataFrame:
+def filter_psi(df_base, df_test, feature_names: list, target: str, psi_threld=0.3) -> pd.DataFrame:
     """
     1、过滤掉 psi > psi_threld 的 特征
-    2、过滤掉 iv_test < iv_threld 的特征
-    3、过滤掉 iv_base < iv_threld 的特征
     返回可用的特征的 psi,iv
     """
     data = []
     for f in feature_names:
         p = psi(df_base[f], df_test[f], n_bin=10)
-        iv_base = mdlutil.iv(df_base, f, target)
-        iv_test = mdlutil.iv(df_test, f, target)
+        iv_base = statsutil.iv(df_base, f, target)
+        iv_test = statsutil.iv(df_test, f, target)
         data.append([f, p, iv_base, iv_test])
     df_iv = pd.DataFrame(data, columns=['feature_name', 'psi', 'iv_base', 'iv_test'])
     # 过滤掉 psi > psi_threld
-    df_iv=df_iv[~(df_iv['psi']>psi_threld)]
-    # iv 过滤
-    df_iv = df_iv[~(df_iv['iv_test'] < iv_threld)]
-    df_iv = df_iv[~(df_iv['iv_base'] < iv_threld)]
+    df_iv = df_iv[~(df_iv['psi'] > psi_threld)]
     return df_iv
