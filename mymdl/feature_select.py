@@ -180,18 +180,6 @@ def psi(data_base: Union[list, np.array, pd.Series],
     return np.round(gp['psi'].sum(), 2)
 
 
-def filter_features_psi(df_base, df_test, feature_names: list, threold=0.3) -> List:
-    """
-    拒绝不稳定的特征 >threold 的特征，返回可用的特征
-    """
-    left_feature_names = []
-    for f in feature_names:
-        p = psi(df_base[f], df_test[f], n_bin=10)
-        if p <= threold:
-            left_feature_names.append(f)
-    return left_feature_names
-
-
 def filter_psi(df_base, df_test, feature_names: list, target: str, psi_threld=0.3) -> pd.DataFrame:
     """
     1、过滤掉 psi > psi_threld 的 特征
@@ -200,10 +188,16 @@ def filter_psi(df_base, df_test, feature_names: list, target: str, psi_threld=0.
     data = []
     for f in feature_names:
         p = psi(df_base[f], df_test[f], n_bin=10)
-        iv_base = statsutil.iv(df_base, f, target)
-        iv_test = statsutil.iv(df_test, f, target)
-        data.append([f, p, iv_base, iv_test])
-    df_iv = pd.DataFrame(data, columns=['feature_name', 'psi', 'iv_base', 'iv_test'])
+        if target in df_base.columns and len(df_base[target].nunique()) == 2:
+            iv_base = statsutil.iv(df_base, f, target)
+            iv_test = statsutil.iv(df_test, f, target)
+            data.append([f, p, iv_base, iv_test])
+        else:
+            data.append([f, p])
+    if np.array(data).ndim[1]==2:
+        df_iv = pd.DataFrame(data, columns=['feature_name', 'psi'])
+    else:
+        df_iv = pd.DataFrame(data, columns=['feature_name', 'psi', 'iv_base', 'iv_test'])
     # 过滤掉 psi > psi_threld
     df_iv = df_iv[~(df_iv['psi'] > psi_threld)]
     return df_iv
