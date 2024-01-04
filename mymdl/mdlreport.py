@@ -2,9 +2,8 @@
 模型报告输出
 """
 import pandas as pd
-from model_tools.mymdl import mdlutil
-from model_tools.utils import plotutil
-
+from ..mymdl import mdlutil,statsutil
+from ..utils import plotutil
 
 class ModelReport:
     """
@@ -41,11 +40,11 @@ class ModelReport:
         df_test['sample_type'] = 'test'
         if plot_trte:
             # 训练集分组
-            feature_grid = mdlutil.get_feature_grid(df_train[x], cut_type=1, n_bin=n_bin)
+            feature_grid = statsutil.get_feature_grid(df_train,x, cut_type=1, n_bin=n_bin)
             df_train['sample_type'] = 'train'
             t = pd.concat([df_train[cols], df_test[cols]])
         else:
-            feature_grid = mdlutil.get_feature_grid(df_test[x], cut_type=1, n_bin=n_bin)
+            feature_grid = statsutil.get_feature_grid(df_test,x, cut_type=1, n_bin=n_bin)
             t = df_test[cols]
         fig, gp = plotutil.plot_liftvar(t,  y,x, group_cols+['sample_type'], feature_grid=feature_grid, is_show=is_show)
         if is_save:
@@ -68,11 +67,11 @@ class ModelReport:
             return None
         df_test['sample_type'] = 'test'
         if plot_trte:
-            feature_grid = mdlutil.get_feature_grid(df_train[feature_name], cut_type=1, n_bin=n_bin)
+            feature_grid = statsutil.get_feature_grid(df_train,feature_name, cut_type=1, n_bin=n_bin)
             df_train['sample_type'] = 'train'
             t = pd.concat([df_train[cols], df_test[cols]])
         else:
-            feature_grid = mdlutil.get_feature_grid(df_test[feature_name], cut_type=1, n_bin=n_bin)
+            feature_grid = statsutil.get_feature_grid(df_test,feature_name, cut_type=1, n_bin=n_bin)
             t = df_test[cols]
         feature_desc = self.__feature_dict.get(feature_name, feature_name)
         fig, gp = plotutil.plot_univar_and_pdp(t, x=feature_name, y_true=y_true, y_pred=y_pred,
