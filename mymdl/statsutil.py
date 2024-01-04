@@ -30,7 +30,7 @@ def get_featuregrid_by_equal_width(values: List, n_bin=10):
         bin_index = [mi + (mx - mi) * i / n_bin for i in range(0, n_bin + 1)]
         f = 1.0*np.sort(np.unique(bin_index))
     # 包括无穷大，样本集中数据可能有些最小值，最大值不全
-    f[0] = -np.Inf
+    f[0] = -np.inf
     f[-1] = np.inf
     return np.round(f, 3)
 
@@ -57,7 +57,7 @@ def get_featuregrid_by_equal_freq(values: List, n_bin=10) -> list:
         bin_index = [i / n_bin for i in range(0, n_bin + 1)]
         f = 1.0*np.sort(np.unique(np.quantile(vs_sort, bin_index, method='lower')))
     # 包括无穷大，样本集中数据可能有些最小值，最大值不全
-    f[0] = -np.Inf
+    f[0] = -np.inf
     f[-1] = np.inf
     return np.round(f, 3)
 
@@ -105,8 +105,8 @@ def get_featuregrid_by_chi(df, x, y, n_bin=10, chi2_threold=1.7) -> list:
         else:
             break
     # 包括无穷大，样本集中数据可能有些最小值，最大值不全
-    f[0] = -np.Inf
-    f[-1] = np.inf
+    f[0] = -9999999
+    f[-1] = 9999999
     return np.round(f, 3)
 
 
@@ -162,7 +162,11 @@ def get_bin(df: pd.DataFrame, feature_name: str, y=None, cut_type=1,
             raise ValueError('feature_grid is None ')
     if pd.api.types.is_numeric_dtype(df[feature_name]):
         # 数字型 左闭右开
-        t1['lbl'] = pd.cut(t1[feature_name], feature_grid, include_lowest=True,
+        # 人工强制限制精度，如果pd.IntervalIndex 无法控制，有个自动向上转为fload64
+        labels = []
+        for i, j in zip(feature_grid[:-1], feature_grid[1:]):
+            labels.append('[%s,%s)' % (i, j))
+        t1['lbl'] = pd.cut(t1[feature_name], feature_grid,labels=labels, include_lowest=True,
                            right=False, precision=4, duplicates='drop')
 
     t1['lbl'] = t1['lbl'].astype('category')
