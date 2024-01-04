@@ -59,7 +59,9 @@ def univar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     gp = pd.pivot_table(df, values=y, index=cls_cols,
                         sort='lbl_index', aggfunc=['count', 'sum', 'mean'],
                         fill_value=0, margins=False, observed=True)
+
     gp.columns = ['cnt', 'sum', 'avg']
+    gp = gp.reset_index()
     gp['avg'] = np.round(gp['avg'], 3)
     if group_cols is None or len(group_cols) == 0:
         gp['total'] = gp.cnt.sum()
@@ -76,7 +78,6 @@ def univar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
         gp['accum_sum'] = gp.groupby(group_cols)['sum'].cumsum()
         gp['accum_avg'] = np.round(gp['accum_sum'] / gp['accum_cnt'], 3)
         gp['accum_cnt_over_total'] = np.round(gp.accum_cnt / gp.total, 3)
-    gp = gp.reset_index()
     cols = group_cols + ['lbl', 'lbl_index', 'lbl_left', 'cnt', 'sum', 'avg', 'cnt_over_total', 'accum_cnt',
                          'accum_sum', 'accum_avg',
                          'accum_cnt_over_total', 'total']
@@ -109,7 +110,7 @@ def binary_liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
         gp['lift_bad'] = np.round(gp['rate_bad'] / gp['all_rate_bad'], 1)
     cols = group_cols + ['lbl', 'lbl_index', 'lbl_left', 'cnt', 'cnt_bad', 'rate_bad', 'cnt_over_total', 'accum_cnt',
                          'accum_cnt_bad', 'accum_rate_bad',
-                         'accum_cnt_over_total', 'lift_bad', 'total', 'all_bad_rate']
+                         'accum_cnt_over_total', 'lift_bad', 'total', 'all_rate_bad']
     return gp[cols]
 
 

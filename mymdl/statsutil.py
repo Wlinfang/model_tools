@@ -162,7 +162,6 @@ def get_bin(df: pd.DataFrame, feature_name: str, y=None, cut_type=1,
             raise ValueError('feature_grid is None ')
     if pd.api.types.is_numeric_dtype(df[feature_name]):
         # 数字型 左闭右开
-        print(feature_grid)
         t1['lbl'] = pd.cut(t1[feature_name], feature_grid, include_lowest=True,
                            right=False, precision=4, duplicates='drop')
 
