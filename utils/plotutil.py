@@ -257,19 +257,25 @@ def plot_liftvar(df, y_true: str, y_pred: str, group_cols=[], feature_grid=[], c
         gc = gcs[ix]
         color = colors[ix]
         tmp = gp[gp['legend_name'] == gc]
+        # 数据格式为 [[lbl,cnt,rate],[lbl,cnt,rate]],显示为遍历每一条数据
+        cusdata=np.stack([tmp[n] for n in ['lbl','cnt','rate_bad','cnt_over_total','accum_rate_bad','accum_cnt_over_total','lift_bad']],
+                            axis=-1)
         fig.add_trace(
             go.Scatter(x=tmp['lbl'], y=tmp['rate_bad'], mode='lines+markers',
                        name=gc, line=dict(color=color),
-                       hovertext=['legend_name', 'lbl', 'cnt', 'rate_bad'],
-                       hovertemplate=gc + '<br><br>lbl=%{x}<br>rate_bad=%{y}<extra></extra>',
+                       customdata=cusdata,
+                       # extra hide legend from hover info
+                       hovertemplate='<B>%{customdata[0]}</B><br><br>cnt=%{customdata[1]}<br>'+
+                                     'rate_bad=%{y}<br>'+'cnt_over_total=%{customdata[3]}<br>'+
+                       'accum_rate_bad=%{customdata[4]}<br>'+'accum_cnt_over_total=%{customdata[5]}<br><extra></extra>',
                        legendgroup=gc, showlegend=False),
             row=1, col=1, secondary_y=False
         )
         fig.add_trace(
             go.Scatter(x=tmp['lbl'], y=tmp['lift_bad'], mode='lines+markers',
                        name=gc, line=dict(color=color),
-                       hovertext=['legend_name', 'lbl', 'accum_cnt', 'lift_bad'],
-                       hovertemplate=gc + '<br><br>lbl=%{x}<br>lift_bad=%{y}<extra></extra>',
+                       customdata=cusdata,
+                       hovertemplate='<B>%{customdata[0]}</B><br><br>cnt=%{customdata[1]}<br>'+'lift_bad=%{customdata[6]}<br><extra></extra>',
                        legendgroup=gc, showlegend=True),
             row=1, col=2, secondary_y=False
         )
