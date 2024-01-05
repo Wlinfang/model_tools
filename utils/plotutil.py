@@ -7,7 +7,7 @@ import seaborn as sns
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
-from model_tools.mymdl import mdlutil
+from ..mymdl import statsutil, mdlutil
 
 
 def plot_hist(df, x, group_cols=[], feature_grid=[], n_bin=20, title='', is_show=False):
@@ -63,7 +63,7 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, group_cols=[], feature_grid=[], c
     返回 fig,gp
     """
     # 对x 进行分组
-    df = mdlutil.get_bin(df, x, cut_type=1, n_bin=n_bin, feature_grid=feature_grid)
+    df = statsutil.get_bin(df, x, cut_type=cut_type, n_bin=n_bin, feature_grid=feature_grid)
     if group_cols is None or len(group_cols) == 0:
         # 每组求y_true & y_pred 的均值
         gp = df.groupby(['lbl']).agg(
@@ -72,6 +72,12 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, group_cols=[], feature_grid=[], c
             rate_bad=(y_true, 'mean'),
             score_avg=(y_pred, 'mean')
         ).reset_index()
+        gp['total'] = df.shape[0]
+        gp['cnt_over_total'] = np.round(gp.cnt / df.shape[0], 3)
+        gp['accum_cnt'] = gp['cnt'].cumsum()
+        gp['accum_cnt_bad'] = gp['cnt_bad'].cumsum()
+        gp['accum_rate_bad'] = np.round(gp.accum_cnt_bad / gp.accum_cnt, 3)
+        gp['accum_cnt_over_total'] = np.round(gp.accum_cnt / df.shape[0], 3)
         gp['group_cols_str'] = ''
     else:
         gp = df.groupby(group_cols + ['lbl']).agg(
@@ -80,6 +86,13 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, group_cols=[], feature_grid=[], c
             rate_bad=(y_true, 'mean'),
             score_avg=(y_pred, 'mean')
         ).reset_index()
+        gp = gp.merge(gp.groupby(group_cols).cnt.sum().reset_index().rename(columns={'cnt': 'total'}), on=group_cols,
+                      how='left')
+        gp['cnt_over_total'] = np.round(gp.cnt / gp.total, 3)
+        gp['accum_cnt'] = gp.groupby(group_cols)['cnt'].cumsum()
+        gp['accum_cnt_bad'] = gp.groupby(group_cols)['cnt_bad'].cumsum()
+        gp['accum_rate_bad'] = np.round(gp.accum_cnt_bad / gp.accum_cnt, 3)
+        gp['accum_cnt_over_total'] = np.round(gp.accum_cnt / gp.total, 3)
         gp['group_cols_str'] = gp[group_cols].apply(
             lambda xx: '::'.join(['{}={}'.format(k, v) for k, v in zip(group_cols, xx)]),
             axis=1)
@@ -87,7 +100,7 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, group_cols=[], feature_grid=[], c
     gp['score_avg'] = np.round(gp['score_avg'], 6)
     gp['lbl'] = gp['lbl'].astype(str)
     # 画图 x-y_true
-    fig = make_subplots(rows=2, cols=1, subplot_titles=('univar-' + title, 'pdp-' + title),
+    fig = make_subplots(rows=2, cols=1, subplot_titles=('univar-' + title or x, 'pdp-' + title or x),
                         specs=[
                             [{"secondary_y": True}],
                             [{"secondary_y": False}]
@@ -103,10 +116,16 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, group_cols=[], feature_grid=[], c
         gc = gcs[ix]
         color = colors[ix]
         tmp = gp[gp['group_cols_str'] == gc]
+        custdata = np.stack([tmp[n] for n in ['lbl', 'cnt', 'rate_bad', 'cnt_over_total', 'accum_cnt', 'accum_rate_bad',
+                                              'accum_cnt_over_total']],
+                            axis=-1)
         fig.add_trace(
             go.Scatter(x=tmp['lbl'], y=tmp['rate_bad'], mode='lines+markers',
                        name=gc, line=dict(color=color),
-                       hovertemplate=gc + '<br><br>lbl=%{x}<br>rate_bad=%{y}<extra></extra>',
+                       customdata=custdata,
+                       hovertemplate=gc + '<br>lbl=%{x}<br>rate_bad=%{y}<br>' +'cnt_over_total=%{customdata[3]}<br>'
+                                      +'accum_rate_bad=%{customdata[5]}<br>'+'accum_cnt_over_total=%{customdata[6]}<br>'
+                                     +'<extra></extra>',
                        legendgroup=gc, showlegend=False),
             row=1, col=1, secondary_y=False
         )
@@ -135,7 +154,7 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, group_cols=[], feature_grid=[], c
         xaxis=dict(visible=False),
         xaxis2=dict(title=x, tickangle=-30),
         yaxis=dict(title=y_true, zeroline=True, range=[0, gp['rate_bad'].max() + 0.001]),
-        yaxis2=dict(title='cnt', zeroline=True),
+        yaxis2=dict(title='cnt', zeroline=True,scaleanchor='y1'),
         yaxis3=dict(title=y_pred, zeroline=True),
         width=800,
         height=900 * 0.8
@@ -258,16 +277,18 @@ def plot_liftvar(df, y_true: str, y_pred: str, group_cols=[], feature_grid=[], c
         color = colors[ix]
         tmp = gp[gp['legend_name'] == gc]
         # 数据格式为 [[lbl,cnt,rate],[lbl,cnt,rate]],显示为遍历每一条数据
-        cusdata=np.stack([tmp[n] for n in ['lbl','cnt','rate_bad','cnt_over_total','accum_rate_bad','accum_cnt_over_total','lift_bad']],
-                            axis=-1)
+        cusdata = np.stack([tmp[n] for n in
+                            ['lbl', 'cnt', 'rate_bad', 'cnt_over_total', 'accum_rate_bad', 'accum_cnt_over_total',
+                             'lift_bad']],
+                           axis=-1)
         fig.add_trace(
             go.Scatter(x=tmp['lbl'], y=tmp['rate_bad'], mode='lines+markers',
                        name=gc, line=dict(color=color),
                        customdata=cusdata,
                        # extra hide legend from hover info
-                       hovertemplate='<B>%{customdata[0]}</B><br><br>cnt=%{customdata[1]}<br>'+
-                                     'rate_bad=%{y}<br>'+'cnt_over_total=%{customdata[3]}<br>'+
-                       'accum_rate_bad=%{customdata[4]}<br>'+'accum_cnt_over_total=%{customdata[5]}<br><extra></extra>',
+                       hovertemplate='<B>%{customdata[0]}</B><br><br>cnt=%{customdata[1]}<br>' +
+                                     'rate_bad=%{y}<br>' + 'cnt_over_total=%{customdata[3]}<br>' +
+                                     'accum_rate_bad=%{customdata[4]}<br>' + 'accum_cnt_over_total=%{customdata[5]}<br><extra></extra>',
                        legendgroup=gc, showlegend=False),
             row=1, col=1, secondary_y=False
         )
@@ -275,7 +296,7 @@ def plot_liftvar(df, y_true: str, y_pred: str, group_cols=[], feature_grid=[], c
             go.Scatter(x=tmp['lbl'], y=tmp['lift_bad'], mode='lines+markers',
                        name=gc, line=dict(color=color),
                        customdata=cusdata,
-                       hovertemplate='<B>%{customdata[0]}</B><br><br>cnt=%{customdata[1]}<br>'+'lift_bad=%{customdata[6]}<br><extra></extra>',
+                       hovertemplate='<B>%{customdata[0]}</B><br><br>cnt=%{customdata[1]}<br>' + 'lift_bad=%{customdata[6]}<br><extra></extra>',
                        legendgroup=gc, showlegend=True),
             row=1, col=2, secondary_y=False
         )
