@@ -100,13 +100,18 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, group_cols=[], feature_grid=[], c
     gp['score_avg'] = np.round(gp['score_avg'], 6)
     gp['lbl'] = gp['lbl'].astype(str)
     # 画图 x-y_true
+    # fig = make_subplots(rows=2, cols=1, subplot_titles=('univar-' + title or x, 'pdp-' + title or x),
+    #                     specs=[
+    #                         [{"secondary_y": True}],
+    #                         [{"secondary_y": False}]
+    #                     ],
+    #                     shared_xaxes="all",
+    #                     # shared_yaxes="all",
+    #                     vertical_spacing=0.06,
+    #                     horizontal_spacing=0.04
+    #                     )
     fig = make_subplots(rows=2, cols=1, subplot_titles=('univar-' + title or x, 'pdp-' + title or x),
-                        specs=[
-                            [{"secondary_y": True}],
-                            [{"secondary_y": False}]
-                        ],
                         shared_xaxes="all",
-                        # shared_yaxes="all",
                         vertical_spacing=0.06,
                         horizontal_spacing=0.04
                         )
@@ -123,18 +128,18 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, group_cols=[], feature_grid=[], c
             go.Scatter(x=tmp['lbl'], y=tmp['rate_bad'], mode='lines+markers',
                        name=gc, line=dict(color=color),
                        customdata=custdata,
-                       hovertemplate=gc + '<br>lbl=%{x}<br>rate_bad=%{y}<br>' +'cnt_over_total=%{customdata[3]}<br>'
-                                      +'accum_rate_bad=%{customdata[5]}<br>'+'accum_cnt_over_total=%{customdata[6]}<br>'
-                                     +'<extra></extra>',
+                       hovertemplate=gc + '<br>lbl=%{x}<br><br>cnt=%{customdata[1]}<br>rate_bad=%{y}<br>' + 'cnt_over_total=%{customdata[3]}<br>'
+                                     + 'accum_rate_bad=%{customdata[5]}<br>' + 'accum_cnt_over_total=%{customdata[6]}<br>'
+                                     + '<extra></extra>',
                        legendgroup=gc, showlegend=False),
             row=1, col=1, secondary_y=False
         )
-        fig.add_trace(
-            go.Bar(x=tmp['lbl'], y=tmp['cnt'], name=gc, opacity=0.5, marker=dict(color=color),
-                   hovertemplate=gc + '<br><br>lbl=%{x}<br>cnt=%{y}<extra></extra>',
-                   yaxis='y2', legendgroup=gc, showlegend=False),
-            row=1, col=1, secondary_y=True
-        )
+        # fig.add_trace(
+        #     go.Bar(x=tmp['lbl'], y=tmp['cnt'], name=gc, opacity=0.5, marker=dict(color=color),
+        #            hovertemplate=gc + '<br><br>lbl=%{x}<br>cnt=%{y}<extra></extra>',
+        #            yaxis='y2', legendgroup=gc, showlegend=False),
+        #     row=1, col=1, secondary_y=True
+        # )
         # x:y_pred
         fig.add_trace(
             go.Scatter(x=tmp['lbl'], y=tmp['score_avg'], mode='lines+markers',
@@ -154,7 +159,7 @@ def plot_univar_and_pdp(df, x, y_true, y_pred, group_cols=[], feature_grid=[], c
         xaxis=dict(visible=False),
         xaxis2=dict(title=x, tickangle=-30),
         yaxis=dict(title=y_true, zeroline=True, range=[0, gp['rate_bad'].max() + 0.001]),
-        yaxis2=dict(title='cnt', zeroline=True,scaleanchor='y1'),
+        # yaxis2=dict(title='cnt', zeroline=True, range=[0,gp['cnt'].max()+1]),
         yaxis3=dict(title=y_pred, zeroline=True),
         width=800,
         height=900 * 0.8
