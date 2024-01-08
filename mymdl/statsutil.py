@@ -32,7 +32,7 @@ def get_featuregrid_by_equal_width(values: List, n_bin=10):
     # 包括无穷大，样本集中数据可能有些最小值，最大值不全
     f[0] = -np.inf
     f[-1] = np.inf
-    return np.round(f, 3)
+    return np.sort(np.unique(np.round(f, 3)))
 
 
 def get_featuregrid_by_equal_freq(values: List, n_bin=10) -> list:
@@ -59,7 +59,7 @@ def get_featuregrid_by_equal_freq(values: List, n_bin=10) -> list:
     # 包括无穷大，样本集中数据可能有些最小值，最大值不全
     f[0] = -np.inf
     f[-1] = np.inf
-    return np.round(f, 3)
+    return np.sort(np.unique(np.round(f, 3)))
 
 
 def get_featuregrid_by_chi(df, x, y, n_bin=10, chi2_threold=1.7) -> list:
@@ -277,6 +277,48 @@ def describe_df(df, feature_names: list) -> pd.DataFrame:
     return df_num
 
 
+def psi(data_base: Union[list, np.array, pd.Series],
+        data_test: Union[list, np.array, pd.Series], feature_grid=[], n_bin=10):
+    """
+    支持数值型&类别型，计算的时候，剔除空值
+    :param data_base: 基准值
+    :param data_test: 观察值
+    :param feature_grid 分组参数 如果未指定，则按照等频 n_bin 分组
+    :return psi   >0.25  分布差异明显
+    """
+    if (data_base is None) or (data_test is None):
+        raise ValueError('data error')
+    # 类型转换
+    data_base = np.array(data_base)
+    data_test = np.array(data_test)
+    data_base = pd.DataFrame(data_base, columns=['data'])
+    data_test = pd.DataFrame(data_test, columns=['data'])
+    data_base['data'] = pd.to_numeric(data_base['data'], errors='ignore')
+    data_test['data'] = pd.to_numeric(data_test['data'], errors='ignore')
+    # 去除空值
+    data_base = data_base[data_base['data'].notna()]
+    data_test = data_test[data_test['data'].notna()]
+    if not pd.api.types.is_numeric_dtype(data_base):
+        # 非数字
+        data_base['lbl'] = data_base['data']
+        data_test['lbl'] = data_test['data']
+    else:
+        # 对 data_base 进行分组
+        if feature_grid:
+            feature_grid = get_featuregrid_by_equal_freq(data_base, n_bin=n_bin)
+        data_base = get_bin(data_base, 'data', feature_grid=feature_grid)
+        data_test = get_bin(data_test, 'data', feature_grid=feature_grid)
+    # 统计每个区间的分布
+    gp_base = data_base.groupby('lbl')['data'].count().reset_index()
+    gp_test = data_test.groupby('lbl')['data'].count().reset_index()
+    gp_base['rate'] = np.round(gp_base['data'] / data_base.shape[0], 3)
+    gp_test['rate'] = np.round(gp_test['data'] / data_test.shape[0], 3)
+    gp = gp_base.merge(gp_test, on='lbl', how='outer', suffixes=('_base', '_test'))
+    # psi 分组计算求和，分组公式=(base_rate-pre_rate) * ln(base_rate/pre_rate)
+    gp[['rate_base', 'rate_test']].fillna(0, inplace=True)
+    eps = np.finfo(np.float32).eps
+    gp['psi'] = (gp.rate_base - gp.rate_test) * np.log((gp.rate_base + eps) / (gp.rate_test + eps))
+    return np.round(gp['psi'].sum(), 2)
 
 def ctribtion_rate_one(df_base, df_test, x, sub_group_cols: list, group_cols=[]) -> pd.DataFrame:
     """
