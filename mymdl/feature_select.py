@@ -144,13 +144,13 @@ def filter_psi(df_base, df_test, feature_names: list, target: str, psi_threld=0.
     data = []
     for f in feature_names:
         p = statsutil.psi(df_base[f], df_test[f], n_bin=10)
-        if target in df_base.columns and len(df_base[target].nunique()) == 2:
+        if target in df_base.columns and df_base[target].nunique() == 2:
             iv_base = statsutil.iv(df_base, f, target)
             iv_test = statsutil.iv(df_test, f, target)
             data.append([f, p, iv_base, iv_test])
         else:
             data.append([f, p])
-    if np.array(data).ndim[1]==2:
+    if np.array(data).shape[1] == 2:
         df_iv = pd.DataFrame(data, columns=['feature_name', 'psi'])
     else:
         df_iv = pd.DataFrame(data, columns=['feature_name', 'psi', 'iv_base', 'iv_test'])
