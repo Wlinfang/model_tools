@@ -87,7 +87,7 @@ def get_featuregrid_by_chi(df, x, y, n_bin=10, chi2_threold=1.7) -> list:
         # 区间内，每个类别的数量统计
         gp = df.groupby(['lbl_left', y]).size().reset_index().rename(columns={0: 'lbl_y_cnt'})
         gp = gp.merge(gp_x, on='lbl_left', how='left')
-        gp = gp.merge(gp_y, on=y, how='lbl_left')
+        gp = gp.merge(gp_y, on=y, how='left')
         # 每个区间期望数量= y_rate * lbl_cnt
         gp['lbl_y_expt_cnt'] = np.round(gp.y_rate * gp.lbl_cnt, 1)
         # 每个区间卡方值= (期实际数量 - 期望数量)^2 / 期望数量

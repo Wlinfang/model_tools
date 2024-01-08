@@ -100,7 +100,7 @@ def binary_liftvar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
     if group_cols is None or len(group_cols) == 0:
         # lift = rate_bad / all_bad_rate
         all_bad_rate = np.round(gp['cnt_bad'].sum() / gp['cnt'].sum(), 4)
-        gp['all_bad_rate'] = all_bad_rate
+        gp['all_rate_bad'] = all_bad_rate
         gp['lift_bad'] = np.round(gp['rate_bad'] / all_bad_rate, 1)
     else:
         tmp = gp.groupby(group_cols).agg(all_cnt_bad=('cnt_bad', 'sum'),

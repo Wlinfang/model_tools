@@ -325,7 +325,7 @@ def plot_liftvar(df, y_true: str, y_pred: str, group_cols=[], feature_grid=[], c
     return fig, gp
 
 
-def plot_scores_liftvar(df, x_scores: list, target, n_bin=10, is_show=False):
+def plot_scores_liftvar(df, x_scores: list, target, n_bin=10, title='',is_show=False):
     """
     多个模型分的lift图
     数据为明细数据
@@ -347,7 +347,7 @@ def plot_scores_liftvar(df, x_scores: list, target, n_bin=10, is_show=False):
     t2['key'] = 'lift_bad'
     t = pd.concat([t1, t2])
     fig = px.line(t, x='lbl_index', y='value', color='model_name', line_group='model_name', facet_col='key',
-                  orientation='h', facet_col_wrap=1, markers=True,
+                  orientation='h', facet_col_wrap=1, markers=True,title=title,
                   width=900, height=900 * 0.62)
     fig.update_yaxes(
         matches=None,
