@@ -91,7 +91,7 @@ def get_featuregrid_by_chi(df, x, y, n_bin=10, chi2_threold=1.7) -> list:
         # 每个区间期望数量= y_rate * lbl_cnt
         gp['lbl_y_expt_cnt'] = np.round(gp.y_rate * gp.lbl_cnt, 1)
         # 每个区间卡方值= (期实际数量 - 期望数量)^2 / 期望数量
-        gp['chi2'] = np.round((gp.lbl_y_cnt - gp['lbl_y_expt_cnt']) ^ 2 / gp['lbl_y_expt_cnt'], 3)
+        gp['chi2'] = np.round((gp.lbl_y_cnt - gp['lbl_y_expt_cnt'])**2 / gp['lbl_y_expt_cnt'], 3)
         gp = gp.groupby('lbl_left')['chi2'].sum().reset_index()
         # 计算相邻两区间的卡方=各个区间的卡方的和
         gp['last_chi2'] = gp['chi2'].shift(periods=1)
@@ -164,8 +164,9 @@ def get_bin(df: pd.DataFrame, feature_name: str, y=None, cut_type=1,
         # 数字型 左闭右开
         # 人工强制限制精度，如果pd.IntervalIndex 无法控制，有个自动向上转为fload64
         labels = []
-        for i, j in zip(feature_grid[:-1], feature_grid[1:]):
-            labels.append('[%s,%s)' % (i, j))
+        # for i, j in zip(feature_grid[:-1], feature_grid[1:]):
+        #     labels.append('[%s,%s)' % (i, j))
+        labels = pd.IntervalIndex.from_breaks(feature_grid,closed='left')
         t1['lbl'] = pd.cut(t1[feature_name], feature_grid,labels=labels, include_lowest=True,
                            right=False, precision=4, duplicates='drop')
 

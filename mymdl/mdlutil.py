@@ -78,7 +78,7 @@ def univar(df: pd.DataFrame, x: str, y: str, feature_grid=[],
         gp['accum_sum'] = gp.groupby(group_cols)['sum'].cumsum()
         gp['accum_avg'] = np.round(gp['accum_sum'] / gp['accum_cnt'], 3)
         gp['accum_cnt_over_total'] = np.round(gp.accum_cnt / gp.total, 3)
-    cols = group_cols + ['lbl', 'lbl_index', 'lbl_left', 'cnt', 'sum', 'avg', 'cnt_over_total', 'accum_cnt',
+    cols = group_cols + ['lbl', 'lbl_index','lbl_left','cnt', 'sum', 'avg', 'cnt_over_total', 'accum_cnt',
                          'accum_sum', 'accum_avg',
                          'accum_cnt_over_total', 'total']
     return gp[cols]
