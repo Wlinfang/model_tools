@@ -60,6 +60,7 @@ def filter_iv(df, feature_cols: list, target: str, iv_threold=0.02) -> pd.DataFr
     # 计算iv 值
     iv_dict = {}
     for f in feature_cols:
+        print(f)
         iv_value = statsutil.iv(df, f, target, n_bin=10)
         if iv_value < iv_threold:
             continue

@@ -57,6 +57,7 @@ def get_featuregrid_by_equal_freq(values: List, n_bin=10) -> list:
         bin_index = [i / n_bin for i in range(0, n_bin + 1)]
         f = 1.0*np.sort(np.unique(np.quantile(vs_sort, bin_index, method='lower')))
     # 包括无穷大，样本集中数据可能有些最小值，最大值不全
+    f=np.array(f,dtype=np.float64)
     f[0] = -np.inf
     f[-1] = np.inf
     return np.sort(np.unique(np.round(f, 3)))
@@ -166,8 +167,8 @@ def get_bin(df: pd.DataFrame, feature_name: str, y=None, cut_type=1,
         labels = []
         # for i, j in zip(feature_grid[:-1], feature_grid[1:]):
         #     labels.append('[%s,%s)' % (i, j))
-        labels = pd.IntervalIndex.from_breaks(feature_grid,closed='left')
-        t1['lbl'] = pd.cut(t1[feature_name], feature_grid,labels=labels, include_lowest=True,
+        feature_grid = np.array(feature_grid, dtype=np.float64)
+        t1['lbl'] = pd.cut(t1[feature_name], list(feature_grid), include_lowest=True,
                            right=False, precision=4, duplicates='drop')
 
     t1['lbl'] = t1['lbl'].astype('category')

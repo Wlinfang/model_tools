@@ -15,7 +15,7 @@ def plot_hist(df, x, group_cols=[], feature_grid=[], n_bin=20, title='', is_show
     概率密度图 显示数量+比例图，等宽分布
     左y: 比例；；右y:数量
     """
-    gp = mdlutil.histvar(df, x, feature_grid, cut_type=2, n_bin=n_bin, group_cols=group_cols)
+    gp = mdlutil.histvar(df, x, feature_grid, n_bin=n_bin, group_cols=group_cols)
     fig = plot_line_with_bar(gp, 'lbl', y_line='cnt_rate', y_bar='cnt', group_cols=group_cols, title=title,
                              is_show=is_show)
     return fig, gp
@@ -310,11 +310,11 @@ def plot_liftvar(df, y_true: str, y_pred: str, group_cols=[], feature_grid=[], c
         matches=None,
     )
     fig.update_layout(
-        title=dict(text=title, y=0.9, x=0.5, xanchor='center', yanchor='top'),
+        title=dict(text=title or y_pred, y=0.9, x=0.5, xanchor='center', yanchor='top'),
         # 横向图例
         legend=dict(orientation='h', yanchor="bottom", y=-0.4, xanchor="left", x=0),
-        xaxis=dict(title=y_pred, tickangle=-30),
-        xaxis2=dict(title=y_pred, tickangle=-30),
+        xaxis=dict(tickangle=-30),
+        xaxis2=dict(tickangle=-30),
         yaxis=dict(title=y_true, zeroline=True, range=[0, gp['rate_bad'].max() + 0.001]),
         yaxis2=dict(title='', zeroline=True),
         width=1000,
