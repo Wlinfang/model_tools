@@ -100,7 +100,9 @@ def parse_week(df: pd.DataFrame, date_name: str, date_name_new: str):
     df[date_name] = pd.to_datetime(df[date_name])
     df[date_name_new] = df[date_name].dt.strftime('%w')
     df[date_name_new] = df[date_name_new].astype(int)
-    df[date_name_new] = df.apply(lambda x: x[date_name] + datetime.timedelta(days=-x[date_name_new]), axis=1)
+    df[date_name_new] = df.apply(
+        lambda x: x[date_name] + datetime.timedelta(days=-6 if x[date_name_new] == 0 else -x[date_name_new] + 1),
+        axis=1)
     df[date_name_new] = pd.to_datetime(df[date_name_new]).dt.date
     return df
 
